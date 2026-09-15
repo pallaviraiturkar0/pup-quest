@@ -1,0 +1,15 @@
+{
+  "name": "pup-quest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tiny, original pixel-art puppy platformer.",
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
