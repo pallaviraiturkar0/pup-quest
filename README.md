@@ -33,6 +33,12 @@ Open `http://localhost:4173`. Use `PORT=8080 npm start` to choose another port. 
 npm test
 ```
 
+To lint, install the development tooling once with `npm ci` (the game itself has no runtime dependencies), then run:
+
+```sh
+npm run lint
+```
+
 The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions. A full-campaign input replay also checks that all three trails can be completed without losing a heart, using ordinary movement and jumps.
 
 ## How it works
