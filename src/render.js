@@ -1,35 +1,12 @@
 import { GROUND_Y, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
-
-const PALETTES = {
-  meadow: {
-    sky: "#cde3d3", horizon: "#e8edcb", cloud: "#f5f3db", cloudShade: "#e1e9ce",
-    far: "#b2cdac", hill: "#99bd98", treeBack: "#8db18b", tree: "#719862",
-    treeLight: "#87ad71", trunk: "#938260", grass: "#a6bc75", grassLight: "#c8d493",
-    grassDark: "#6f9458", dirt: "#ad8a62", dirtLight: "#bc9b71", dirtDark: "#977754",
-    stone: "#8e9c79", water: "#82b7ac", waterLight: "#b3d7c4", flower: "#efce7c",
-  },
-  forest: {
-    sky: "#bad3c7", horizon: "#d8e4c2", cloud: "#e9edcf", cloudShade: "#cbdcc5",
-    far: "#a1beb0", hill: "#81a99a", treeBack: "#6f9680", tree: "#4e7960",
-    treeLight: "#648d64", trunk: "#80765c", grass: "#8da869", grassLight: "#b3c782",
-    grassDark: "#587d4f", dirt: "#968362", dirtLight: "#aa9771", dirtDark: "#7d7056",
-    stone: "#738d79", water: "#6b9f9b", waterLight: "#99c6b2", flower: "#e2ad83",
-  },
-  night: {
-    sky: "#343f63", horizon: "#75748c", cloud: "#81849f", cloudShade: "#626e91",
-    far: "#677b91", hill: "#586f82", treeBack: "#4f687a", tree: "#405b6a",
-    treeLight: "#577878", trunk: "#666679", grass: "#8eaa98", grassLight: "#b7c8a8",
-    grassDark: "#667f80", dirt: "#7b7b83", dirtLight: "#92908c", dirtDark: "#676977",
-    stone: "#a0a69b", water: "#556d98", waterLight: "#849bb6", flower: "#e9d593",
-  },
-};
+import { resolveColor, THEMES, themeForLevel } from "./themes.js";
 
 const noise = (n) => {
   const value = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return value - Math.floor(value);
 };
 
-export function createRenderer(canvas) {
+export function createRenderer(canvas, { themeOverride = null } = {}) {
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("This browser does not support the canvas needed to play Pup Quest.");
   ctx.imageSmoothingEnabled = false;
@@ -103,55 +80,205 @@ export function createRenderer(canvas) {
     ctx.restore();
   }
 
-  function background(game, time, palette, reducedMotion) {
+  function palm(x, floor, size, palette) {
+    ctx.save();
+    ctx.translate(Math.round(x), floor);
+    ctx.scale(size, size);
+    for (let segment = 0; segment < 8; segment += 1) {
+      const lean = Math.round(segment * segment * 0.12);
+      rect(-3 + lean, -8 - segment * 8, 6, 9, segment % 2 ? palette.trunk : palette.dirtDark);
+    }
+    const top = -70;
+    const crown = 8;
+    rect(crown - 14, top - 4, 28, 5, palette.tree);
+    rect(crown - 22, top, 14, 4, palette.tree);
+    rect(crown + 8, top, 14, 4, palette.tree);
+    rect(crown - 26, top + 4, 6, 5, palette.tree);
+    rect(crown + 20, top + 4, 6, 5, palette.tree);
+    rect(crown - 8, top - 9, 16, 6, palette.treeLight);
+    rect(crown - 15, top - 6, 8, 3, palette.treeLight);
+    rect(crown + 7, top - 6, 8, 3, palette.treeLight);
+    rect(crown - 4, top + 1, 4, 4, palette.trunk);
+    rect(crown + 1, top + 2, 4, 4, palette.dirtDark);
+    ctx.restore();
+  }
+
+  function lamp(x, floor, layer, theme, time) {
+    const post = resolveColor(theme, layer.post);
+    const light = resolveColor(theme, layer.light);
+    if (layer.glow) {
+      ctx.globalAlpha = 0.12 + Math.sin(time * 2 + x * 0.01) * 0.03;
+      rect(x - 13, floor - 58, 28, 26, light);
+      rect(x - 8, floor - 63, 18, 36, light);
+      ctx.globalAlpha = 1;
+    }
+    rect(x, floor - 46, 2, 46, post);
+    rect(x - 2, floor - 3, 6, 3, post);
+    rect(x - 4, floor - 50, 10, 3, post);
+    rect(x - 3, floor - 47, 8, 5, light);
+    rect(x - 1, floor - 53, 4, 3, post);
+  }
+
+  const wrap = (value, span) => ((value % span) + span) % span;
+
+  const LAYER_PAINTERS = {
+    stars(layer, game, time, theme, reducedMotion) {
+      for (let i = 0; i < layer.count; i += 1) {
+        const x = (noise(i + 20) * 560 - game.cameraX * layer.parallax + 560) % 560;
+        const y = noise(i + 130) * 123 + 8;
+        ctx.globalAlpha = reducedMotion ? 0.7 : 0.5 + Math.sin(time * 1.6 + i) * 0.3;
+        rect(x, y, 1 + (i % 7 === 0 ? 1 : 0), 1, resolveColor(theme, layer.color));
+      }
+      ctx.globalAlpha = 1;
+    },
+    sun(layer, game, time, theme) {
+      const x = 376 - game.cameraX * layer.parallax;
+      const halo = resolveColor(theme, layer.halo);
+      const color = resolveColor(theme, layer.color);
+      rect(x - 3, 25, 32, 32, halo);
+      rect(x + 3, 21, 20, 40, halo);
+      rect(x, 29, 26, 24, color);
+      rect(x + 5, 24, 16, 34, color);
+      return x;
+    },
+    moon(layer, game, time, theme) {
+      const x = LAYER_PAINTERS.sun(layer, game, time, theme);
+      rect(x + 17, 27, 9, 20, resolveColor(theme, layer.shadow));
+      rect(x + 12, 24, 12, 7, resolveColor(theme, layer.shadow));
+      rect(x + 5, 36, 3, 3, resolveColor(theme, layer.crater));
+    },
+    clouds(layer, game, time, theme, reducedMotion) {
+      for (let i = -1; i < layer.count - 1; i += 1) {
+        const drift = reducedMotion ? 0 : time * 1.3;
+        const x = ((i * 137 + 700 - game.cameraX * layer.parallax + drift) % 700) - 100;
+        cloud(x, 25 + noise(i + 7) * 56, 0.7 + noise(i + 9) * 0.65, theme.palette);
+      }
+    },
+    birds(layer, game, time, theme) {
+      const color = resolveColor(theme, layer.color);
+      for (let i = 0; i < layer.count; i += 1) {
+        const x = wrap(noise(i + 60) * 560 - game.cameraX * layer.parallax + time * (8 + i * 2), 560) - 40;
+        const y = 34 + noise(i + 61) * 58 + Math.sin(time * 1.5 + i) * 3;
+        const flap = Math.floor(time * 5 + i * 1.7) % 2;
+        rect(x, y + flap, 3, 1, color);
+        rect(x + 3, y + 1, 1, 1, color);
+        rect(x + 4, y + flap, 3, 1, color);
+      }
+    },
+    sea(layer, game, time, theme) {
+      const water = resolveColor(theme, layer.color);
+      const foam = resolveColor(theme, layer.foam);
+      rect(0, layer.top, VIEW_WIDTH, 224 - layer.top, water);
+      rect(0, layer.top, VIEW_WIDTH, 1, foam);
+      for (let row = 0; row < 5; row += 1) {
+        const y = layer.top + 5 + row * 6;
+        const shift = game.cameraX * layer.parallax * (1 + row * 0.5) + time * (row % 2 ? 4 : -4);
+        for (let i = 0; i < 9; i += 1) {
+          const x = wrap(i * 61 + noise(row * 9 + i) * 40 - shift, 540) - 30;
+          rect(x, y, 6 + row * 2, 1, foam);
+        }
+      }
+    },
+    hills(layer, game, time, theme) {
+      const { spacing } = layer;
+      const offset = game.cameraX * layer.parallax;
+      const color = resolveColor(theme, layer.color);
+      for (let i = -1; i < 6; i += 1) {
+        const x = i * spacing - (offset % spacing);
+        const top = layer.top + noise(i + (layer.seed ?? 0)) * 27;
+        polygon([[x - 20, 224], [x - 20, top + 45], [x + 5, top + 45], [x + 5, top + 28], [x + 25, top + 28], [x + 25, top + 12], [x + 51, top + 12], [x + 51, top], [x + 83, top], [x + 83, top + 11], [x + 103, top + 11], [x + 103, top + 29], [x + 132, top + 29], [x + 132, 224]], color);
+      }
+    },
+    dunes(layer, game, time, theme) {
+      const { spacing } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      const color = resolveColor(theme, layer.color);
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        const index = i + Math.floor(scroll / spacing);
+        const x = i * spacing - (scroll % spacing);
+        const height = layer.height * (0.6 + noise(index + 80) * 0.8);
+        const points = [[x - spacing * 0.4, 224]];
+        for (let step = 0; step <= 12; step += 1) {
+          const t = step / 12;
+          points.push([x - spacing * 0.4 + t * spacing * 1.8, layer.top - Math.sin(t * Math.PI) * height]);
+        }
+        points.push([x + spacing * 1.4, 224]);
+        polygon(points, color);
+      }
+    },
+    skyline(layer, game, time, theme) {
+      const { spacing } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      const body = resolveColor(theme, layer.color);
+      const glass = resolveColor(theme, layer.window);
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        const index = i + Math.floor(scroll / spacing);
+        const x = Math.round(i * spacing - (scroll % spacing));
+        const w = Math.round(spacing * (0.7 + noise(index * 3 + 1) * 0.45));
+        const h = Math.round(layer.minHeight + noise(index * 3 + 2) * (layer.maxHeight - layer.minHeight));
+        const top = layer.base - h;
+        rect(x, top, w, 224 - top, body);
+        if (noise(index * 7 + 5) > 0.7) rect(x + Math.floor(w / 2), top - 9, 1, 9, body);
+        else if (noise(index * 7 + 6) > 0.6) rect(x + 3, top - 4, w - 6, 4, body);
+        for (let row = top + 5; row < layer.base - 6; row += 8) {
+          for (let col = x + 3; col < x + w - 4; col += 6) {
+            const on = layer.lit === 0 || noise(index * 131 + (row - top) * 7 + (col - x)) < layer.lit;
+            if (on) rect(col, row, 2, 3, glass);
+          }
+        }
+      }
+    },
+    trees(layer, game, time, theme) {
+      const scroll = game.cameraX * layer.parallax;
+      for (let i = -1; i < 9; i += 1) {
+        const index = i + Math.floor(scroll / 88);
+        const x = i * 88 - (scroll % 88) + noise(index) * 21;
+        const size = 0.7 + noise(index + 40) * 0.65;
+        if (layer.style === "round") tree(x, 199, size, theme.palette, true);
+        else pine(x, 204, size, theme.palette);
+      }
+    },
+    palms(layer, game, time, theme) {
+      const { spacing } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        const index = i + Math.floor(scroll / spacing);
+        if (noise(index + 90) < 0.25) continue;
+        const x = i * spacing - (scroll % spacing) + noise(index + 91) * 40;
+        palm(x, 200, 0.75 + noise(index + 92) * 0.4, theme.palette);
+      }
+    },
+    hedges(layer, game, time, theme) {
+      const scroll = game.cameraX * layer.parallax;
+      const color = resolveColor(theme, layer.color);
+      const highlight = resolveColor(theme, layer.highlight);
+      for (let i = -1; i < 14; i += 1) {
+        const index = i + Math.floor(scroll / 40);
+        const x = i * 40 - (scroll % 40);
+        const h = 8 + Math.floor(noise(index + 70) * 7);
+        rect(x, 198 - h, 42, h, color);
+        rect(x + 4, 196 - h, 30, 4, color);
+        rect(x + 6, 197 - h, 12, 2, highlight);
+      }
+    },
+    lamps(layer, game, time, theme) {
+      const { spacing } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        lamp(Math.round(i * spacing - (scroll % spacing) + 30), 199, layer, theme, time);
+      }
+    },
+  };
+
+  function background(game, time, theme, reducedMotion) {
+    const { palette } = theme;
     rect(0, 0, VIEW_WIDTH, VIEW_HEIGHT, palette.sky);
     for (let y = 0; y < 8; y += 1) {
       ctx.globalAlpha = y / 11;
       rect(0, 64 + y * 20, VIEW_WIDTH, 20, palette.horizon);
     }
     ctx.globalAlpha = 1;
-    const night = game.level.theme === "night";
-    if (night) {
-      for (let i = 0; i < 42; i += 1) {
-        const x = (noise(i + 20) * 560 - game.cameraX * 0.05 + 560) % 560;
-        const y = noise(i + 130) * 123 + 8;
-        ctx.globalAlpha = reducedMotion ? 0.7 : 0.5 + Math.sin(time * 1.6 + i) * 0.3;
-        rect(x, y, 1 + (i % 7 === 0 ? 1 : 0), 1, "#f7eac7");
-      }
-      ctx.globalAlpha = 1;
-    }
-    const sunX = 376 - game.cameraX * 0.025;
-    const sunColor = night ? "#ede9c8" : "#f5e8aa";
-    rect(sunX - 3, 25, 32, 32, night ? "#626687" : "#dce5c2");
-    rect(sunX + 3, 21, 20, 40, night ? "#626687" : "#dce5c2");
-    rect(sunX, 29, 26, 24, sunColor);
-    rect(sunX + 5, 24, 16, 34, sunColor);
-    if (night) {
-      rect(sunX + 17, 27, 9, 20, "#68718d");
-      rect(sunX + 12, 24, 12, 7, "#68718d");
-      rect(sunX + 5, 36, 3, 3, "#d2d4b6");
-    }
-    for (let i = -1; i < 6; i += 1) {
-      const drift = reducedMotion ? 0 : time * 1.3;
-      const x = ((i * 137 + 700 - game.cameraX * 0.11 + drift) % 700) - 100;
-      cloud(x, 25 + noise(i + 7) * 56, 0.7 + noise(i + 9) * 0.65, palette);
-    }
-    for (let layer = 0; layer < 2; layer += 1) {
-      const spacing = layer ? 124 : 161;
-      const offset = game.cameraX * (layer ? 0.18 : 0.1);
-      for (let i = -1; i < 6; i += 1) {
-        const x = i * spacing - (offset % spacing);
-        const top = (layer ? 131 : 109) + noise(i + layer * 30) * 27;
-        polygon([[x - 20, 224], [x - 20, top + 45], [x + 5, top + 45], [x + 5, top + 28], [x + 25, top + 28], [x + 25, top + 12], [x + 51, top + 12], [x + 51, top], [x + 83, top], [x + 83, top + 11], [x + 103, top + 11], [x + 103, top + 29], [x + 132, top + 29], [x + 132, 224]], layer ? palette.hill : palette.far);
-      }
-    }
-    for (let i = -1; i < 9; i += 1) {
-      const index = i + Math.floor(game.cameraX * 0.32 / 88);
-      const x = i * 88 - (game.cameraX * 0.32 % 88) + noise(index) * 21;
-      const size = 0.7 + noise(index + 40) * 0.65;
-      if (game.level.theme === "meadow") tree(x, 199, size, palette, true);
-      else pine(x, 204, size, palette);
-    }
+    for (const layer of theme.layers) LAYER_PAINTERS[layer.kind](layer, game, time, theme, reducedMotion);
     rect(0, 198, VIEW_WIDTH, 12, palette.grassDark);
     for (let x = 0; x < VIEW_WIDTH; x += 8) {
       rect(x, 194 + noise(Math.floor(x + game.cameraX * 0.3)) * 5, 8, 8, palette.grassDark);
@@ -207,15 +334,44 @@ export function createRenderer(canvas) {
     rect(x + 3, y - 6, 2, 1, palette.cloud);
   }
 
-  function decorations(game, palette) {
+  function shell(x, y) {
+    rect(x - 3, y - 3, 7, 3, "#f3d5c0");
+    rect(x - 2, y - 5, 5, 2, "#f8e4d3");
+    rect(x - 1, y - 4, 1, 3, "#d9a98f");
+    rect(x + 1, y - 4, 1, 3, "#d9a98f");
+  }
+
+  function bench(x, palette) {
+    rect(x - 13, GROUND_Y - 12, 28, 3, palette.trunk);
+    rect(x - 13, GROUND_Y - 18, 28, 3, palette.trunk);
+    rect(x - 12, GROUND_Y - 17, 26, 1, palette.dirtLight);
+    rect(x - 11, GROUND_Y - 9, 2, 9, "#5d6a61");
+    rect(x + 11, GROUND_Y - 9, 2, 9, "#5d6a61");
+    rect(x - 11, GROUND_Y - 18, 2, 9, "#5d6a61");
+    rect(x + 11, GROUND_Y - 18, 2, 9, "#5d6a61");
+  }
+
+  function hydrant(x) {
+    rect(x - 4, GROUND_Y - 14, 9, 14, "#c9604f");
+    rect(x - 5, GROUND_Y - 16, 11, 3, "#e07d63");
+    rect(x - 2, GROUND_Y - 19, 5, 3, "#e07d63");
+    rect(x - 7, GROUND_Y - 10, 3, 3, "#c9604f");
+    rect(x + 5, GROUND_Y - 10, 3, 3, "#c9604f");
+    rect(x - 2, GROUND_Y - 12, 1, 9, "#e9a088");
+    rect(x - 5, GROUND_Y - 2, 11, 2, "#8b4a42");
+  }
+
+  function decorations(game, theme) {
     const { level, cameraX } = game;
+    const { palette, decor } = theme;
     const from = Math.floor(cameraX / 24) * 24;
     for (let x = from; x < cameraX + VIEW_WIDTH + 24; x += 24) {
       if (!level.ground.some((ground) => x > ground.x + 4 && x < ground.x + ground.w - 6)) continue;
       const seed = Math.floor(x / 24);
       if (noise(seed) > 0.3) flower(x + 4, GROUND_Y - 1, palette, seed);
       if (noise(seed + 8) > 0.88) {
-        if (level.theme === "forest") mushroom(x + 12, GROUND_Y, palette);
+        if (decor.scatter === "mushroom") mushroom(x + 12, GROUND_Y, palette);
+        else if (decor.scatter === "shell") shell(x + 13, GROUND_Y);
         else {
           rect(x + 10, GROUND_Y - 4, 8, 3, palette.stone);
           rect(x + 12, GROUND_Y - 6, 4, 3, palette.stone);
@@ -225,8 +381,11 @@ export function createRenderer(canvas) {
     for (const x of [178, 541, 1073, 1553, 2105]) {
       if (x < cameraX - 35 || x > cameraX + VIEW_WIDTH + 35) continue;
       if (!level.ground.some((ground) => x > ground.x + 20 && x < ground.x + ground.w - 20)) continue;
-      if (level.theme === "meadow") tree(x, GROUND_Y, 0.7, palette);
-      else if (level.theme === "forest") {
+      if (decor.landmark === "tree") tree(x, GROUND_Y, 0.7, palette);
+      else if (decor.landmark === "palm") palm(x, GROUND_Y, 0.6, palette);
+      else if (decor.landmark === "bench") bench(x, palette);
+      else if (decor.landmark === "hydrant") hydrant(x);
+      else if (decor.landmark === "stump") {
         rect(x - 8, GROUND_Y - 13, 18, 12, palette.trunk);
         rect(x - 10, GROUND_Y - 15, 22, 5, palette.dirtLight);
         rect(x - 5, GROUND_Y - 14, 12, 1, palette.dirtDark);
@@ -295,7 +454,7 @@ export function createRenderer(canvas) {
     }
     rect(x + 39, y + 17, 10, 2, "#b19c70");
     rect(x + 40, y + 19, 8, 3, "#b19c70");
-    flower(x + 43, y + 17, PALETTES.meadow, 5);
+    flower(x + 43, y + 17, THEMES.meadow.palette, 5);
   }
 
   function checkpoint(flag, time) {
@@ -388,9 +547,10 @@ export function createRenderer(canvas) {
   }
 
   function render(game, time, dt, reducedMotion) {
-    const palette = PALETTES[game.level.theme];
+    const theme = themeForLevel(game.level, themeOverride);
+    const { palette } = theme;
     const decorativeTime = reducedMotion ? 0 : time;
-    background(game, decorativeTime, palette, reducedMotion);
+    background(game, decorativeTime, theme, reducedMotion);
     ctx.save();
     ctx.translate(-Math.floor(game.cameraX), 0);
     for (const gap of game.level.gaps) {
@@ -401,7 +561,7 @@ export function createRenderer(canvas) {
         rect(gap.x + shift, GROUND_Y + 20 + row * 8, Math.min(9, gap.w - shift), 1, palette.waterLight);
       }
     }
-    decorations(game, palette);
+    decorations(game, theme);
     for (const ground of game.level.ground) terrain(ground, palette, false, game.cameraX);
     for (const platform of game.level.platforms) terrain(platform, palette, true, game.cameraX);
     for (const spike of game.level.spikes) {

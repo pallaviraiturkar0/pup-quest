@@ -45,6 +45,7 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 
 - `src/engine.js`: deterministic game rules and fixed-step physics.
 - `src/levels.js`: three handcrafted trails and their collectible/platform layouts.
+- `src/themes.js`: data-driven backdrops (palette, parallax layers, and ground decor) picked by each level's `theme`.
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
 - `src/audio.js`: short, original sound effects generated with Web Audio.
 - `src/main.js`: keyboard/multi-touch controls, menus, accessibility announcements, and saved scores.
@@ -52,11 +53,15 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 
 No frameworks, downloaded assets, trackers, analytics, external fonts, backend, or paid services.
 
+## Themed backgrounds
+
+Every backdrop is drawn procedurally from data in `src/themes.js`: a palette plus an ordered list of parallax layers (sun or moon, stars, clouds, birds, sea, hills, dunes, city skylines, trees, palms, hedges, and street lamps). A level picks its backdrop with its `theme` field; unknown names fall back to the meadow. Besides the meadow, forest, and starlit night used by the current trails, there are **park**, **beach**, and **city** (night city) themes ready for new trails. Preview any theme on any trail with a query string, for example `?theme=beach` or `?theme=city`.
+
 ## Free hosting
 
-The public repository uses **GitHub Pages**' built-in static publishing, with no custom workflow or build step. In repository **Settings > Pages**, select **Deploy from a branch**, choose **copilot/build-pup-quest** and **/ (root)**, and save. GitHub publishes the site whenever that branch changes. The `.nojekyll` file tells Pages to serve the game directly without Jekyll processing.
+The public repository uses **GitHub Pages**' built-in static publishing, with no custom workflow or build step. In repository **Settings > Pages**, **Deploy from a branch** is set to **main** and **/ (root)**, so GitHub publishes the site whenever `main` changes. The `.nojekyll` file tells Pages to serve the game directly without Jekyll processing.
 
-Run `npm test` locally before publishing changes. The publishing branch has a `copilot/` prefix because the connected GitHub integration restricts direct pushes to `main`.
+Run `npm test` locally before publishing changes.
 
 All URLs are relative, so the game works at the repository's `github.io/pup-quest/` address or another static host. Keeping the repository public allows GitHub Pages hosting on GitHub Free.
 

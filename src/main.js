@@ -1,11 +1,12 @@
 import { createGame, nextLevel, pauseGame, restartGame, resumeGame, startGame, stepGame } from "./engine.js";
 import { LEVELS } from "./levels.js";
 import { createRenderer } from "./render.js";
+import { themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("game-canvas");
-const renderer = createRenderer(canvas);
+const renderer = createRenderer(canvas, { themeOverride: themeOverrideFromSearch(location.search) });
 const sound = new Sound();
 export const game = createGame();
 const heldKeys = new Set();
