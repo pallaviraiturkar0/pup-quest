@@ -1,3 +1,5 @@
+import { makeEnemy } from "./enemies.js";
+
 export const TILE = 16;
 export const VIEW_WIDTH = 480;
 export const VIEW_HEIGHT = 256;
@@ -22,10 +24,17 @@ function trail({ name, theme, columns, gaps, platforms, treats, key, checkpoint,
     key: { x: key[0] * TILE + 8, y: key[1] },
     checkpoint: { x: checkpoint * TILE, y: GROUND_Y, active: false },
     spikes: spikes.map(([x, w]) => ({ x: x * TILE + 2, y: GROUND_Y - 8, w: w * TILE - 4, h: 8 })),
-    enemies: enemies.map(([x, left, right, speed]) => ({
-      x: x * TILE, y: GROUND_Y - 12, w: 18, h: 12,
-      left: left * TILE, right: right * TILE, speed, direction: 1, alive: true,
-    })),
+    // Plain [x, left, right, speed] tuples are ground squirrels; objects pick a
+    // type and may stand on a platform row instead of the ground.
+    enemies: enemies.map((spec) => {
+      const { type, x, left, right, speed, row, phase } = Array.isArray(spec)
+        ? { x: spec[0], left: spec[1], right: spec[2], speed: spec[3] }
+        : spec;
+      return makeEnemy({
+        type, x: x * TILE, left: left * TILE, right: right * TILE, speed, phase,
+        floor: row === undefined ? GROUND_Y : row * TILE,
+      });
+    }),
     exit: { x: (columns - 6) * TILE, y: GROUND_Y - 32, w: 32, h: 32 },
   };
 }
@@ -65,7 +74,11 @@ export const LEVELS = [
     treats: [[5, 188], [9, 164], [15, 132], [16, 132], [21, 148], [29, 164], [35, 132], [36, 132], [41, 100], [45, 164], [47, 164], [54, 164], [60, 132], [65, 100], [66, 100], [71, 164], [79, 164], [85, 132], [86, 132], [91, 100], [97, 164], [99, 164], [106, 164], [112, 132], [117, 100], [118, 100], [123, 164], [125, 164], [132, 164], [139, 148], [140, 148]],
     key: [92, 94], checkpoint: 75,
     spikes: [[31, 1], [57, 2], [87, 1], [108, 2], [134, 1]],
-    enemies: [[25, 25, 28, 22], [49, 48, 52, 24], [101, 101, 104, 26], [127, 127, 130, 24]],
+    enemies: [
+      [25, 25, 28, 22], [49, 48, 52, 24], [101, 101, 104, 26], [127, 127, 130, 24],
+      { type: "vacuum", x: 38, left: 37, right: 42, speed: 20 },
+      { type: "vacuum", x: 113, left: 112, right: 119, speed: 22 },
+    ],
   }),
   trail({
     name: "Seashell Shore", theme: "beach", columns: 156,
@@ -74,7 +87,11 @@ export const LEVELS = [
     treats: [[5, 188], [9, 164], [14, 132], [19, 164], [21, 164], [26, 132], [31, 100], [32, 100], [37, 164], [39, 164], [45, 164], [50, 132], [53, 164], [55, 164], [61, 164], [66, 132], [71, 100], [75, 164], [77, 164], [83, 164], [87, 132], [88, 132], [93, 164], [100, 132], [105, 100], [109, 164], [111, 164], [117, 132], [118, 132], [122, 100], [127, 62], [131, 164], [133, 164], [140, 164], [146, 148], [150, 188]],
     key: [128, 62], checkpoint: 80,
     spikes: [[28, 2], [47, 1], [63, 2], [84, 1], [101, 2], [119, 2], [142, 1]],
-    enemies: [[33, 32, 36, 24], [56, 56, 59, 27], [88, 87, 90, 28], [112, 112, 115, 28], [136, 135, 138, 30]],
+    enemies: [
+      [33, 32, 36, 24], [56, 56, 59, 27], [88, 87, 90, 28], [112, 112, 115, 28], [136, 135, 138, 30],
+      { type: "seagull", x: 63, left: 62, right: 70, speed: 24 },
+      { type: "seagull", x: 117, left: 116, right: 124, speed: 26, phase: 1.3 },
+    ],
   }),
   trail({
     name: "Neon Nightwalk", theme: "city", columns: 168,
@@ -83,6 +100,10 @@ export const LEVELS = [
     treats: [[4, 188], [8, 164], [13, 132], [17, 164], [19, 164], [25, 132], [30, 100], [35, 164], [37, 164], [42, 132], [47, 100], [51, 164], [58, 164], [63, 132], [67, 164], [69, 164], [75, 132], [80, 100], [85, 164], [87, 164], [93, 164], [98, 132], [101, 164], [108, 132], [113, 100], [119, 164], [121, 164], [126, 132], [130, 100], [133, 62], [137, 164], [139, 164], [144, 132], [151, 164], [159, 148], [160, 148]],
     key: [134, 62], checkpoint: 90,
     spikes: [[22, 2], [40, 1], [55, 2], [71, 2], [94, 1], [109, 2], [123, 2], [146, 1]],
-    enemies: [[26, 25, 29, 26], [44, 43, 46, 28], [60, 59, 61, 28], [77, 76, 80, 30], [103, 103, 106, 30], [128, 127, 131, 30], [156, 154, 157, 32]],
+    enemies: [
+      [26, 25, 29, 26], [44, 43, 46, 28], [60, 59, 61, 28], [77, 76, 80, 30], [103, 103, 106, 30], [128, 127, 131, 30], [156, 154, 157, 32],
+      { type: "cat", x: 66, left: 65, right: 69.875, speed: 22, row: 11 },
+      { type: "cat", x: 129, left: 129, right: 130.875, speed: 14, row: 7, phase: 1.1 },
+    ],
   }),
 ];
