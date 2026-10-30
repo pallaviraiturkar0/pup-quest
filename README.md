@@ -4,7 +4,7 @@
 
 **[Play Pup Quest](https://pallaviraiturkar0.github.io/pup-quest/)**
 
-Run, jump, collect treats, and find the golden key to open the doghouse. Explore three handcrafted trails: Sunny Meadow, Mossy Hollow, and Starlit Summit. Inspired by the approachable platforming of DOS-era games like Dangerous Dave, with entirely original code, levels, artwork, and synthesized sound effects.
+Run, jump, collect treats, and find the golden key to open the doghouse. Explore six handcrafted trails: Sunny Meadow, Mossy Hollow, Starlit Summit, Puppy Park, Seashell Shore, and Neon Nightwalk. Inspired by the approachable platforming of DOS-era games like Dangerous Dave, with entirely original code, levels, artwork, and synthesized sound effects.
 
 ## Controls
 
@@ -39,12 +39,12 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions. A full-campaign input replay also checks that all three trails can be completed without losing a heart, using ordinary movement and jumps.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions. A full-campaign input replay also checks that all six trails can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, the golden key, and the doghouse.
 
 ## How it works
 
 - `src/engine.js`: deterministic game rules and fixed-step physics.
-- `src/levels.js`: three handcrafted trails and their collectible/platform layouts.
+- `src/levels.js`: six handcrafted trails and their collectible/platform layouts.
 - `src/themes.js`: data-driven backdrops (palette, parallax layers, and ground decor) picked by each level's `theme`.
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
 - `src/audio.js`: short, original sound effects generated with Web Audio.
@@ -55,7 +55,7 @@ No frameworks, downloaded assets, trackers, analytics, external fonts, backend, 
 
 ## Themed backgrounds
 
-Every backdrop is drawn procedurally from data in `src/themes.js`: a palette plus an ordered list of parallax layers (sun or moon, stars, clouds, birds, sea, hills, dunes, city skylines, trees, palms, hedges, and street lamps). A level picks its backdrop with its `theme` field; unknown names fall back to the meadow. Besides the meadow, forest, and starlit night used by the current trails, there are **park**, **beach**, and **city** (night city) themes ready for new trails. Preview any theme on any trail with a query string, for example `?theme=beach` or `?theme=city`.
+Every backdrop is drawn procedurally from data in `src/themes.js`: a palette plus an ordered list of parallax layers (sun or moon, stars, clouds, birds, sea, hills, dunes, city skylines, trees, palms, hedges, and street lamps). A level picks its backdrop with its `theme` field; unknown names fall back to the meadow. The first three trails use the meadow, forest, and starlit night; Puppy Park, Seashell Shore, and Neon Nightwalk use the **park**, **beach**, and **city** (night city) themes. Preview any theme on any trail with a query string, for example `?theme=beach` or `?theme=city`.
 
 ## Free hosting
 

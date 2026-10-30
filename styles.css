@@ -107,7 +107,7 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .adventure-heading { flex-shrink: 0; }
 .adventure-heading .eyebrow { font-size: 8px; color: #939984; letter-spacing: 1.1px; }
 .adventure-heading p { font-size: 12px; font-weight: 600; margin: 6px 0 0; }
-.trail-list { list-style: none; padding: 0; margin: 0; display: flex; gap: 12px; flex: 1; }
+.trail-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; flex: 1; }
 .trail { padding: 13px 14px; display: flex; align-items: center; gap: 12px; border: 1px solid #dedfd2; border-radius: 4px; flex: 1; min-width: 0; background: #eeeee436; }
 .trail.active { border-color: #b9c9a2; background: #e9eddd; }
 .trail > div { display: grid; gap: 5px; }
@@ -117,8 +117,14 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .meadow-icon { color: #829863; }
 .forest-icon { color: #8b9a85; }
 .night-icon { color: #a0a3a0; }
+.park-icon { color: #8fa77a; }
+.beach-icon { color: #b9a386; }
+.city-icon { color: #9f9cae; }
 .trail.active .forest-icon { color: #718a66; }
 .trail.active .night-icon { color: #9392b8; }
+.trail.active .park-icon { color: #5f9a5c; }
+.trail.active .beach-icon { color: #6fb3c2; }
+.trail.active .city-icon { color: #c9a94f; }
 .trail-state { color: #a4b593; margin-left: auto; font-size: 10px; }
 .below-game { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0 26px; }
 .below-game p { font-size: 10px; color: #929785; margin: 0; }

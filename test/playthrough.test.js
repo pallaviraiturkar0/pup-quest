@@ -31,6 +31,36 @@ const ROUTES = [
     [1836, 144], [1910, 112, true], [1931, 112], [2010, 176, true],
     [2077, 176], [2180, 176, true], [2290, 208],
   ],
+  [
+    [234, 208], [146, 176, true], [158, 176], [248, 144, true], [334, 176, true],
+    [530, 208, true], [466, 176, true], [478, 176], [568, 144, true], [658, 112, true],
+    [730, 176, true], [900, 208, true], [872, 176, true], [962, 144, true],
+    [1048, 112, true], [1134, 176, true], [1342, 208, true], [1266, 176, true], [1278, 176],
+    [1368, 144, true], [1464, 112, true], [1562, 176, true], [1714, 208, true],
+    [1698, 176, true], [1794, 144, true], [1880, 112, true], [1978, 176, true],
+    [2202, 208, true], [2120, 176, true], [2144, 176], [2226, 160, true], [2190, 208, true],
+    [2312, 208],
+  ],
+  [
+    [234, 208], [146, 176, true], [226, 144, true], [314, 176, true], [350, 176],
+    [418, 144, true], [504, 112, true], [606, 176, true], [734, 208, true],
+    [722, 176, true], [802, 144, true], [858, 176, true], [992, 208, true],
+    [978, 176, true], [1058, 144, true], [1138, 112, true], [1210, 176, true],
+    [1332, 208, true], [1330, 176, true], [1400, 144, true], [1486, 176, true], [1522, 176],
+    [1602, 144, true], [1682, 112, true], [1754, 176, true], [1790, 176], [1880, 144, true],
+    [1954, 112, true], [2040, 80, true], [2106, 176, true], [2312, 208, true],
+    [2242, 176, true], [2338, 160, true], [2300, 208, true], [2408, 208],
+  ],
+  [
+    [130, 176, true], [210, 144, true], [282, 176, true], [318, 176], [402, 144, true],
+    [482, 112, true], [570, 176, true], [606, 176], [674, 144, true], [754, 112, true],
+    [814, 176, true], [866, 208, true], [930, 176, true], [1010, 144, true],
+    [1082, 176, true], [1118, 176], [1202, 144, true], [1282, 112, true], [1370, 176, true],
+    [1492, 208, true], [1490, 176, true], [1570, 144, true], [1614, 176, true], [1650, 176],
+    [1730, 144, true], [1810, 112, true], [1914, 176, true], [1950, 176], [2018, 144, true],
+    [2082, 112, true], [2146, 80, true], [2202, 176, true], [2238, 176], [2306, 144, true],
+    [2414, 176, true], [2450, 176], [2546, 160, true], [2580, 208, true], [2600, 208],
+  ],
 ];
 
 function travel(game, x, floor, jump = false) {
@@ -55,7 +85,7 @@ function travel(game, x, floor, jump = false) {
   assert.fail(`${game.level.name}: cannot reach ${x}/${floor}; stopped at ${game.player.x.toFixed(1)}/${(game.player.y + game.player.h).toFixed(1)}`);
 }
 
-test("a real-input playthrough reaches every golden key and wins all three trails without losing a heart", () => {
+test("a real-input playthrough reaches every golden key and wins all six trails without losing a heart", () => {
   const game = createGame();
   startGame(game);
   stepGame(game);
