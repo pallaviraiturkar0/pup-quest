@@ -13,7 +13,7 @@ const COLOR_FIELDS = ["color", "halo", "shadow", "crater", "window", "foam", "hi
 
 test("every level uses a defined theme and existing levels keep their backdrops", () => {
   for (const level of LEVELS) assert.ok(Object.hasOwn(THEMES, level.theme), `${level.name} theme ${level.theme}`);
-  assert.deepEqual(LEVELS.map((level) => level.theme), ["meadow", "forest", "night"]);
+  assert.deepEqual(LEVELS.map((level) => level.theme), ["meadow", "forest", "night", "park", "beach", "city"]);
 });
 
 test("the new park, beach, and night city backdrops are available", () => {

@@ -124,7 +124,7 @@ function syncOverlay() {
     paused: ["TAKE A LITTLE BREATHER", "Paws for a moment.", "Your adventure will be right here. Good dogs need snack breaks, too.", "Keep exploring"],
     "level-complete": ["ONE TRAIL CLOSER TO HOME", "Look at you go!", `${game.level.name}, conquered. A fresh trail and a little extra heart are waiting.`, "Next trail"],
     "game-over": ["EVERY ADVENTURE TAKES PRACTICE", "A little tumble.", "Even the best dogs miss a jump. Shake it off, wag that tail, and give it another go.", "Try again"],
-    won: ["CERTIFIED VERY GOOD DOG", "Home, sweet woof.", "Three trails. A pocket full of treats. And a well-earned nap. Welcome home, Biscuit.", "Play again"],
+    won: ["CERTIFIED VERY GOOD DOG", "Home, sweet woof.", "Six trails. A pocket full of treats. And a well-earned nap. Welcome home, Biscuit.", "Play again"],
   };
   const [kicker, title, description, action] = screens[game.status];
   $("overlay-kicker").textContent = `✦ ${kicker}`;

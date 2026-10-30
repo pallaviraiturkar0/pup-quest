@@ -213,7 +213,7 @@ test("three falls end a run; restarting resets campaign state", () => {
   assert.equal(game.deaths, 0);
 });
 
-test("all three trails lead to victory without overflowing the level array", () => {
+test("every trail leads to victory without overflowing the level array", () => {
   const game = playing();
   for (let index = 0; index < LEVELS.length; index += 1) {
     assert.equal(game.levelIndex, index);
