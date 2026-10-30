@@ -222,7 +222,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
         else if (noise(index * 7 + 6) > 0.6) rect(x + 3, top - 4, w - 6, 4, body);
         for (let row = top + 5; row < layer.base - 6; row += 8) {
           for (let col = x + 3; col < x + w - 4; col += 6) {
-            const on = layer.lit === 0 || noise(index * 131 + row * 7 + col) < layer.lit;
+            const on = layer.lit === 0 || noise(index * 131 + (row - top) * 7 + (col - x)) < layer.lit;
             if (on) rect(col, row, 2, 3, glass);
           }
         }

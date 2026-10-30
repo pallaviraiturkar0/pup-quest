@@ -103,3 +103,30 @@ test("every theme renders across the level with only valid colors", () => {
     }
   }
 });
+
+test("lit skyline windows stay put on a building while the camera scrolls", () => {
+  const near = THEMES.city.layers.findLast((layer) => layer.kind === "skyline");
+  const glass = resolveColor(THEMES.city, near.window);
+  const windowsAt = (cameraX) => {
+    const spots = new Set();
+    let fill = "";
+    const noop = () => {};
+    const ctx = {
+      globalAlpha: 1, font: "", imageSmoothingEnabled: false,
+      set fillStyle(value) { fill = value; }, get fillStyle() { return fill; },
+      fillRect(x, y) { if (fill === glass) spots.add(`${x + cameraX * near.parallax},${y}`); },
+      beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop,
+      save: noop, restore: noop, translate: noop, scale: noop, fillText: noop,
+    };
+    const renderer = createRenderer({ getContext: () => ctx }, { themeOverride: "city" });
+    const game = createGame();
+    game.cameraX = cameraX;
+    renderer.render(game, 0, 0, true);
+    return spots;
+  };
+  const before = windowsAt(0);
+  const after = windowsAt(5);
+  assert.ok(before.size > 20);
+  const shared = [...before].filter((spot) => after.has(spot)).length;
+  assert.ok(shared / before.size > 0.95, `only ${shared}/${before.size} windows kept their place`);
+});
