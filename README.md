@@ -48,9 +48,9 @@ No frameworks, downloaded assets, trackers, analytics, external fonts, backend, 
 
 ## Free hosting
 
-The public repository uses **GitHub Pages**' built-in static publishing, with no custom workflow or build step. In repository **Settings > Pages**, select **Deploy from a branch**, choose **copilot/build-pup-quest** and **/ (root)**, and save. GitHub publishes the site whenever that branch changes. The `.nojekyll` file tells Pages to serve the game directly without Jekyll processing.
+The public repository uses **GitHub Pages**' built-in static publishing, with no custom workflow or build step. In repository **Settings > Pages**, **Deploy from a branch** is set to **main** and **/ (root)**, so GitHub publishes the site whenever `main` changes. The `.nojekyll` file tells Pages to serve the game directly without Jekyll processing.
 
-Run `npm test` locally before publishing changes. The publishing branch has a `copilot/` prefix because the connected GitHub integration restricts direct pushes to `main`.
+Run `npm test` locally before publishing changes.
 
 All URLs are relative, so the game works at the repository's `github.io/pup-quest/` address or another static host. Keeping the repository public allows GitHub Pages hosting on GitHub Free.
 
