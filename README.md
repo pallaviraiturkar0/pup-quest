@@ -39,12 +39,17 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 
 - `src/engine.js`: deterministic game rules and fixed-step physics.
 - `src/levels.js`: three handcrafted trails and their collectible/platform layouts.
+- `src/themes.js`: data-driven backdrops (palette, parallax layers, and ground decor) picked by each level's `theme`.
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
 - `src/audio.js`: short, original sound effects generated with Web Audio.
 - `src/main.js`: keyboard/multi-touch controls, menus, accessibility announcements, and saved scores.
 - `styles.css`: responsive game page, with reduced-motion and fullscreen support.
 
 No frameworks, downloaded assets, trackers, analytics, external fonts, backend, or paid services.
+
+## Themed backgrounds
+
+Every backdrop is drawn procedurally from data in `src/themes.js`: a palette plus an ordered list of parallax layers (sun or moon, stars, clouds, birds, sea, hills, dunes, city skylines, trees, palms, hedges, and street lamps). A level picks its backdrop with its `theme` field; unknown names fall back to the meadow. Besides the meadow, forest, and starlit night used by the current trails, there are **park**, **beach**, and **city** (night city) themes ready for new trails. Preview any theme on any trail with a query string, for example `?theme=beach` or `?theme=city`.
 
 ## Free hosting
 
