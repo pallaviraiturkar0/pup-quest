@@ -11,6 +11,7 @@ export const PHYSICS = Object.freeze({
   maxFall: 360,
   coyoteTime: 0.1,
   jumpBuffer: 0.12,
+  landingSpeed: 120,
 });
 
 export function intersects(a, b) {
@@ -130,6 +131,8 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
     }
   }
   p.y += p.vy * dt;
+  const wasGrounded = p.grounded;
+  const impactSpeed = p.vy;
   p.grounded = false;
   for (const surface of [...level.ground, ...level.platforms]) {
     if (p.vy >= 0 && previousBottom <= surface.y + 0.1 &&
@@ -140,6 +143,9 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
     }
   }
   p.stride += Math.abs(p.vx) * dt;
+  if (p.grounded && !wasGrounded && impactSpeed >= PHYSICS.landingSpeed) {
+    game.events.push({ type: "land", x: p.x + p.w / 2, y: p.y + p.h, speed: impactSpeed });
+  }
 
   if (p.y > VIEW_HEIGHT + 18) {
     loseLife(game, "fall");
@@ -185,7 +191,7 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
     if (game.keyFound) {
       game.score += game.lives * 50;
       game.status = game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
-      game.events.push({ type: game.status });
+      game.events.push({ type: game.status, x: level.exit.x + level.exit.w / 2, y: level.exit.y });
     } else if (game.exitHintCooldown === 0) {
       game.exitHintCooldown = 3;
       game.events.push({ type: "need-key" });

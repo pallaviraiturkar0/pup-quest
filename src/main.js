@@ -11,7 +11,6 @@ import {
 const $ = (id) => document.getElementById(id);
 const canvas = $("game-canvas");
 const renderer = createRenderer(canvas, { themeOverride: themeOverrideFromSearch(location.search) });
-const sound = new Sound();
 export const game = createGame();
 const heldKeys = new Set();
 const touch = createTouchState();
@@ -63,7 +62,7 @@ if (!Number.isSafeInteger(bestScore) || bestScore < 0) {
   toast("Your saved score couldn't be read. Starting a fresh score.");
   bestScore = 0;
 }
-let soundRequested = savedPreference("sound") === "on";
+const sound = new Sound({ storage: { get: (key) => savedPreference(key), set: (key, value) => savedPreference(key, value) } });
 
 const heartMarkup = (empty) => `<svg class="heart${empty ? " empty" : ""}" viewBox="0 0 16 15" aria-hidden="true"><path d="M2 1h4v2h4V1h4v2h2v5h-2v2h-2v2h-2v2H6v-2H4v-2H2V8H0V3h2Z" fill="currentColor"/></svg>`;
 const timeLabel = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
@@ -104,25 +103,23 @@ function focusGame() {
 }
 
 function updateSoundButton() {
-  $("sound-label").textContent = soundRequested ? "Sound on" : "Sound off";
-  $("sound-button").setAttribute("aria-pressed", String(soundRequested));
-  $("sound-button").querySelector("path").setAttribute("d", soundRequested
+  const on = !sound.muted;
+  $("sound-label").textContent = on ? "Sound on" : "Muted";
+  $("sound-button").setAttribute("aria-pressed", String(on));
+  $("sound-button").querySelector("path").setAttribute("d", on
     ? "M3 8v4h3l4 3V5L6 8H3Zm10-1a5 5 0 0 1 0 6m2-8a8 8 0 0 1 0 10"
     : "M3 8v4h3l4 3V5L6 8H3Zm10-1 4 6m0-6-4 6");
 }
 
-function audioFailed(error) {
-  console.warn("Pup Quest audio could not start:", error);
-  soundRequested = false;
-  sound.enabled = false;
-  savedPreference("sound", "off");
+function toggleSound() {
+  sound.toggleMute();
+  sound.play("treat");
   updateSoundButton();
-  toast("Sound couldn't start in this browser. The adventure still works.");
+  announce(sound.muted ? "Sound muted." : "Sound on.");
 }
 
 function unlockAudio() {
-  if (soundRequested && !sound.enabled) sound.enable().catch(audioFailed);
-  else sound.unlock().catch(audioFailed);
+  sound.unlock();
 }
 
 function setResultStats(items) {
@@ -216,9 +213,7 @@ const POWERUP_MESSAGES = {
 function processEvents() {
   for (const event of game.events.splice(0)) {
     sound.play(event.type);
-    if (["jump", "treat", "key", "stomp", "hurt", "checkpoint", "powerup"].includes(event.type) && !reducedMotion.matches) {
-      renderer.effect(event.type, event.x, event.y);
-    }
+    renderer.effect(event, reducedMotion.matches);
     if (event.type === "key") toast("Golden key found! The doghouse is open.");
     if (event.type === "powerup") toast(POWERUP_MESSAGES[event.powerup](event));
     if (event.type === "checkpoint") toast("Checkpoint! A safe spot for little paws.");
@@ -264,6 +259,11 @@ canvas.addEventListener("pointerdown", () => { if (game.status === "playing") fo
 
 window.addEventListener("keydown", (event) => {
   if ($("help-dialog").open || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.code === "KeyM") {
+    if (!event.repeat) toggleSound();
+    return;
+  }
+  unlockAudio();
   if (["Escape", "KeyP"].includes(event.code) && ["playing", "paused"].includes(game.status)) {
     event.preventDefault();
     if (!event.repeat) togglePause();
@@ -323,6 +323,7 @@ for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
 touchControls.addEventListener("contextmenu", (event) => event.preventDefault());
 
 window.addEventListener("pointerdown", (event) => {
+  unlockAudio();
   if (event.pointerType !== "touch" || touchSeen) return;
   touchSeen = true;
   updateTouchVisibility();
@@ -337,22 +338,8 @@ function suspendGame() {
 window.addEventListener("blur", suspendGame);
 document.addEventListener("visibilitychange", () => { if (document.hidden) suspendGame(); });
 
-$("sound-button").addEventListener("click", async () => {
-  if (soundRequested) {
-    sound.enabled = false;
-    soundRequested = false;
-    savedPreference("sound", "off");
-  } else {
-    try {
-      await sound.enable();
-      soundRequested = true;
-      savedPreference("sound", "on");
-      sound.play("treat");
-    } catch (error) {
-      audioFailed(error);
-    }
-  }
-  updateSoundButton();
+$("sound-button").addEventListener("click", () => {
+  toggleSound();
   if (game.status === "playing") focusGame();
 });
 

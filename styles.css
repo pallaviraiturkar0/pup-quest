@@ -95,6 +95,7 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .toolbar-actions { display: flex; align-items: center; gap: 12px; }
 .toolbar-actions button { display: flex; align-items: center; gap: 7px; background: transparent; font-size: 11px; color: #737e65; padding: 3px; min-height: 25px; }
 .toolbar-actions svg { width: 17px; height: 17px; }
+.touch-ui #sound-button { min-height: 40px; min-width: 40px; padding: 4px 8px; touch-action: manipulation; }
 .toolbar-divider { height: 16px; background: #ced4bf; width: 1px; }
 .touch-controls { display: none; justify-content: space-between; align-items: center; padding: 12px max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left)); gap: 12px; background: #e2e7d2; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .touch-ui .touch-controls { display: flex; }
@@ -219,7 +220,7 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
   .game-toolbar { padding: 8px 11px; min-height: 39px; }
   .keyboard-legend { gap: 12px; }
   .keyboard-legend > span { font-size: 9px; }
-  .keyboard-legend .pause-legend { display: none; }
+  .keyboard-legend .pause-legend, .keyboard-legend .mute-legend { display: none; }
   kbd { font-size: 8px; padding: 2px 4px; min-width: 17px; }
   .space-key { width: 38px; }
   .toolbar-actions { gap: 8px; }

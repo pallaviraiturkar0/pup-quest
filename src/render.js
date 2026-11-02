@@ -1,4 +1,5 @@
 import { GROUND_Y, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
+import { activeParticles, clearParticles, createParticles, emitForEvent, particleAlpha, SHAPE_PIXELS, updateParticles } from "./particles.js";
 import { resolveColor, THEMES, themeForLevel } from "./themes.js";
 
 const noise = (n) => {
@@ -10,7 +11,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) throw new Error("This browser does not support the canvas needed to play Pup Quest.");
   ctx.imageSmoothingEnabled = false;
-  let particles = [];
+  const particles = createParticles();
 
   function rect(x, y, w, h, color) {
     ctx.fillStyle = color;
@@ -666,19 +667,24 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
 
   const CRITTERS = { squirrel: critter, vacuum, seagull, cat };
 
-  function effect(type, x, y) {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-    const dust = type === "jump";
-    const count = dust ? 4 : type === "key" ? 20 : 9;
-    for (let i = 0; i < count; i += 1) {
-      particles.push({
-        x, y, vx: (Math.random() - 0.5) * (dust ? 28 : 65), vy: -Math.random() * 55 - 12,
-        life: dust ? 0.25 : 0.5 + Math.random() * 0.3,
-        size: dust ? 2 : 1 + Math.floor(Math.random() * 2),
-        color: type === "hurt" ? "#d99778" : dust ? "#d8d6a4" : i % 2 ? "#ffedb2" : "#eec571",
-      });
+  function effect(event, reducedMotion = false) {
+    return emitForEvent(particles, event, { reducedMotion });
+  }
+
+  function drawParticle(particle) {
+    ctx.globalAlpha = particleAlpha(particle);
+    const { x, y, size, color, shape } = particle;
+    if (shape === "confetti") {
+      const tilt = Math.abs(Math.cos(particle.spin));
+      rect(x, y, Math.max(1, size * tilt), size, color);
+      return;
     }
-    particles = particles.slice(-150);
+    const pixels = SHAPE_PIXELS[shape];
+    if (!pixels) {
+      rect(x, y, size, size, color);
+      return;
+    }
+    for (const [dx, dy] of pixels) rect(x + dx * size, y + dy * size, size, size, color);
   }
 
   function render(game, time, dt, reducedMotion) {
@@ -736,22 +742,11 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       ctx.globalAlpha = 1;
     }
     puppy(game.player, time, game.status === "ready", decorativeTime);
-    if (!reducedMotion) {
-      for (const particle of particles) {
-        if (game.status === "playing") {
-          particle.life -= dt;
-          particle.x += particle.vx * dt;
-          particle.y += particle.vy * dt;
-          particle.vy += 110 * dt;
-        }
-        ctx.globalAlpha = Math.min(1, particle.life * 3);
-        rect(particle.x, particle.y, particle.size, particle.size, particle.color);
-      }
-      ctx.globalAlpha = 1;
-      particles = particles.filter((particle) => particle.life > 0);
-    }
+    if (game.status !== "paused") updateParticles(particles, dt);
+    for (const particle of activeParticles(particles)) drawParticle(particle);
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
-  return { render, effect, clearEffects: () => { particles = []; } };
+  return { render, effect, clearEffects: () => clearParticles(particles), particles };
 }
