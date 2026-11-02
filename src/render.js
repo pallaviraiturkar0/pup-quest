@@ -515,12 +515,12 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     rect(flag.x, flag.y - 2, 10, 2, "#8c9066");
   }
 
-  function puppy(p, time, idle) {
+  function puppy(p, time, idle, decorativeTime = time) {
     if (p.invincible > 0 && Math.floor(time * 12) % 2 === 0) return;
     if (p.zoomies > 0 && Math.abs(p.vx) > 15) {
       ctx.globalAlpha = 0.6;
       for (let i = 0; i < 3; i += 1) {
-        const length = 6 + ((Math.floor(time * 20) + i) % 3) * 3;
+        const length = 6 + ((Math.floor(decorativeTime * 20) + i) % 3) * 3;
         rect(p.facing > 0 ? p.x - 4 - length : p.x + p.w + 4, p.y + 4 + i * 5, length, 1, "#9fe3ff");
       }
       ctx.globalAlpha = 1;
@@ -735,7 +735,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       rect(game.player.x - 3, game.player.y + game.player.h - 1, 21, 3, "#394c39");
       ctx.globalAlpha = 1;
     }
-    puppy(game.player, time, game.status === "ready");
+    puppy(game.player, time, game.status === "ready", decorativeTime);
     if (!reducedMotion) {
       for (const particle of particles) {
         if (game.status === "playing") {

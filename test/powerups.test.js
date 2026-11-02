@@ -169,3 +169,26 @@ test("power-ups, scared critters, and zoomies draw using only hex colors", () =>
   }
   for (const color of fills) assert.match(color, /^#[0-9a-f]{6}$/i, `drew ${color}`);
 });
+
+test("zoomies speed lines hold still when reduced motion is on", () => {
+  const frames = [];
+  let current = [];
+  const noop = () => {};
+  const ctx = {
+    imageSmoothingEnabled: true, globalAlpha: 1, font: "", fillStyle: "",
+    fillRect(x, y, w, h) { if (this.fillStyle === "#9fe3ff") current.push([x, y, w, h].join()); },
+    beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop,
+    save: noop, restore: noop, translate: noop, scale: noop, fillText: noop,
+  };
+  const renderer = createRenderer({ getContext: () => ctx });
+  const game = arena();
+  Object.assign(game.player, { zoomies: 2, vx: 150 });
+  game.cameraX = game.player.x - 100;
+  for (const time of [0.1, 0.16, 0.21]) {
+    current = [];
+    renderer.render(game, time, 1 / 60, true);
+    frames.push(current.join("|"));
+  }
+  assert.ok(frames[0].length > 0, "speed lines are drawn");
+  assert.equal(new Set(frames).size, 1);
+});
