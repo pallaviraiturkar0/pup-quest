@@ -5,6 +5,7 @@ const MELODIES = {
   checkpoint: [392, 523, 659],
   hurt: [220, 165, 110],
   stomp: [196, 392],
+  powerup: [523, 784, 1046, 1568],
   start: [330, 440, 554, 660],
   "level-complete": [523, 659, 784, 1046, 1318],
   "game-over": [330, 294, 247, 196],

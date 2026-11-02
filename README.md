@@ -17,6 +17,14 @@ Run, jump, collect treats, and find the golden key to open the doghouse. Explore
 
 Hold jump for a higher leap; tap for a short hop. Jump on critters to bounce off them, and avoid spikes and water. Each new trail adds a critter with its own tell: Puppy Park's **robot vacuums** flash red and rev up before dashing at a pup ahead of them, Seashell Shore's **seagulls** glide overhead and swoop down to puppy height (watch their shadow), and Neon Nightwalk's **alley cats** prowl rooftops, crouch, then pounce. Orange checkpoint flags save your position for the current trail. You start with three hearts and recover one on each new trail. Treats are optional; the golden key is required.
 
+### Power-ups
+
+Every trail hides three dog-themed power-ups, all drawn procedurally:
+
+- **Bone treat** (a big bone with a heart): one extra heart, up to five. Extra hearts carry over to the next trail.
+- **Zoomies** (a blue lightning badge): 1.5x running speed for 5 seconds. Losing a heart ends the zoomies.
+- **Squeaky toy** (a pink squeaky ball): critters within about 200 pixels freeze in fright for 4 seconds. Frozen critters can't hurt you, but you can still stomp them.
+
 Sound starts off and can be enabled in the game toolbar. Your personal best and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
 
 ## Run locally
@@ -39,13 +47,14 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing. A full-campaign input replay also checks that all six trails can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. A full-campaign input replay also checks that all six trails can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
 - `src/engine.js`: deterministic game rules and fixed-step physics.
 - `src/levels.js`: six handcrafted trails and their collectible/platform layouts.
 - `src/enemies.js`: data-driven critters (squirrels, robot vacuums, seagulls, alley cats) with their movement rules. Levels place them with objects such as `{ type: "cat", x, left, right, speed, row }`; plain `[x, left, right, speed]` tuples are ground squirrels.
+- `src/powerups.js`: bone treat, zoomies, and squeaky toy rules (pickup, effects, and timers). Levels place them as `[type, column, y]` tuples.
 - `src/themes.js`: data-driven backdrops (palette, parallax layers, and ground decor) picked by each level's `theme`.
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
 - `src/audio.js`: short, original sound effects generated with Web Audio.

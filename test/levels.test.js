@@ -92,7 +92,7 @@ test("every level object stays inside the level bounds", () => {
       assert.ok(thing.x >= 0 && thing.x + (thing.w ?? 0) <= level.width, `${level.name}: ${label} x out of bounds`);
       assert.ok(thing.y >= 0 && thing.y + (thing.h ?? 0) <= VIEW_HEIGHT + 80, `${level.name}: ${label} y out of bounds`);
     };
-    for (const [label, list] of Object.entries({ ground: level.ground, platform: level.platforms, spike: level.spikes, treat: level.treats })) {
+    for (const [label, list] of Object.entries({ ground: level.ground, platform: level.platforms, spike: level.spikes, treat: level.treats, powerup: level.powerups })) {
       list.forEach((thing, index) => inside(thing, `${label} ${index}`));
     }
     level.enemies.forEach((enemy, index) => {
@@ -104,7 +104,7 @@ test("every level object stays inside the level bounds", () => {
     inside(level.exit, "exit");
     inside(level.start, "start");
     assert.ok(level.platforms.every((platform) => platform.y < GROUND_Y), `${level.name}: platform below ground`);
-    assert.ok(level.treats.every((treat) => treat.y < GROUND_Y) && level.key.y < GROUND_Y, `${level.name}: pickup below ground`);
+    assert.ok([...level.treats, ...level.powerups].every((item) => item.y < GROUND_Y) && level.key.y < GROUND_Y, `${level.name}: pickup below ground`);
   }
 });
 
@@ -121,7 +121,7 @@ test("the spawn point is clear of solids, spikes, and critters, and stands on gr
 
 test("pickups are never buried inside solid ground or platforms", () => {
   for (const level of LEVELS) {
-    for (const [index, item] of [...level.treats, level.key].entries()) {
+    for (const [index, item] of [...level.treats, ...level.powerups, level.key].entries()) {
       assert.ok(solids(level).every((solid) => !intersects(box(item), solid)), `${level.name}: pickup ${index} is inside a solid`);
     }
   }
@@ -164,13 +164,16 @@ test("the static jump check agrees with the physics", () => {
   assert.equal(canHop({ x0: 80, x1: 140, y: GROUND_Y - 64 }, ground), true, "dropping down is always fine");
 });
 
-test("on every trail the golden key and the doghouse are reachable with ordinary jumps", () => {
+test("on every trail the golden key, power-ups, and the doghouse are reachable with ordinary jumps", () => {
   for (const level of LEVELS) {
     const { surfaces, reachable } = reachableSurfaces(level);
     const exitFloor = surfaceUnder(surfaces.filter((surface) => surface.id.startsWith("ground")), level.exit.x + 8);
     assert.ok(exitFloor, `${level.name}: the doghouse has no ground under it`);
     assert.ok(reachable.has(exitFloor), `${level.name}: the doghouse cannot be reached`);
     assert.ok([...reachable].some((surface) => canTouch(surface, level.key)), `${level.name}: the golden key cannot be reached`);
+    for (const item of level.powerups) {
+      assert.ok([...reachable].some((surface) => canTouch(surface, item)), `${level.name}: ${item.type} power-up at x=${item.x} cannot be reached`);
+    }
     for (const platform of surfaces) {
       assert.ok(reachable.has(platform), `${level.name}: ${platform.id} at x=${platform.x0}, y=${platform.y} cannot be reached`);
     }
