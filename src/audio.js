@@ -4,6 +4,9 @@
 
 export const SOUND_KEY = "sound";
 export const MASTER_VOLUME = 0.5;
+// How long after a gesture's resume() call sounds may still be scheduled while
+// the context finishes waking up.
+export const RESUME_GRACE_MS = 300;
 
 // A voice is one oscillator (or noise burst) with a pitch sweep and a quick
 // attack/decay envelope. Times are seconds from the start of the sound.
@@ -90,13 +93,16 @@ function defaultContextFactory() {
 // failure (no Web Audio, blocked context, storage errors) is swallowed so the
 // game keeps running silently.
 export class Sound {
-  constructor({ createContext = defaultContextFactory, storage = null } = {}) {
+  constructor({ createContext = defaultContextFactory, storage = null, now = () => Date.now() } = {}) {
+    this.now = now;
     this.createContext = createContext;
     this.storage = storage;
     this.context = null;
     this.master = null;
     this.unavailable = false;
-    this.resuming = false;
+    this.resumeAttempt = 0;
+    this.pendingResume = 0;
+    this.resumeStartedAt = -Infinity;
     this.muted = this.#read() === "off";
   }
 
@@ -112,6 +118,10 @@ export class Sound {
     return this.context?.state === "running";
   }
 
+  get resuming() {
+    return this.pendingResume !== 0 && this.now() - this.resumeStartedAt < RESUME_GRACE_MS;
+  }
+
   unlock() {
     if (this.muted || this.unavailable) return false;
     try {
@@ -125,10 +135,15 @@ export class Sound {
         this.master.gain.value = MASTER_VOLUME;
         this.master.connect(this.context.destination);
       }
-      if (this.context.state === "suspended" && !this.resuming) {
+      // Retry on every gesture while suspended; an earlier attempt may never settle.
+      if (this.context.state === "suspended") {
+        const attempt = ++this.resumeAttempt;
         const resumed = this.context.resume();
-        this.resuming = true;
-        Promise.resolve(resumed).catch(() => {}).finally(() => { this.resuming = false; });
+        this.pendingResume = attempt;
+        this.resumeStartedAt = this.now();
+        Promise.resolve(resumed).catch(() => {}).finally(() => {
+          if (this.pendingResume === attempt) this.pendingResume = 0;
+        });
       }
       return true;
     } catch {
@@ -153,9 +168,9 @@ export class Sound {
 
   play(type) {
     const recipe = soundRecipe(type);
-    // While a gesture's resume() is in flight the clock starts moments later, so
-    // those sounds still play. A context left suspended drops sounds instead of
-    // queuing them up for a burst on the next gesture.
+    // Just after a gesture's resume() the clock starts moments later, so those
+    // sounds still play. A context left suspended (rejected or stuck resume)
+    // drops sounds instead of queuing them for a burst on the next gesture.
     if (!recipe || this.muted || !(this.running || this.resuming)) return false;
     try {
       scheduleRecipe(this.context, recipe, this.master);

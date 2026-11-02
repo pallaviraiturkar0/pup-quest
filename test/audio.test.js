@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MASTER_VOLUME, recipeDuration, scheduleRecipe, Sound, SOUND_KEY, SOUND_RECIPES, soundRecipe } from "../src/audio.js";
+import { MASTER_VOLUME, RESUME_GRACE_MS, recipeDuration, scheduleRecipe, Sound, SOUND_KEY, SOUND_RECIPES, soundRecipe } from "../src/audio.js";
 
 const param = (log, name) => ({
   value: 1,
@@ -160,4 +160,39 @@ test("a closed context never plays", () => {
   const sound = new Sound({ createContext: () => context });
   sound.unlock();
   assert.equal(sound.play("jump"), false);
+});
+
+test("a resume that never settles is retried on the next gesture and cannot queue sounds forever", async () => {
+  let clock = 1000;
+  const context = fakeContext();
+  let calls = 0;
+  context.resume = () => { calls += 1; return new Promise(() => {}); };
+  const sound = new Sound({ createContext: () => context, now: () => clock });
+  sound.unlock();
+  assert.equal(sound.play("start"), true, "the gesture's sound is scheduled during the grace window");
+  clock += RESUME_GRACE_MS + 1;
+  assert.equal(sound.resuming, false);
+  assert.equal(sound.play("jump"), false, "a stuck resume stops scheduling after the grace window");
+
+  context.resume = function resume() { calls += 1; this.state = "running"; return Promise.resolve(); };
+  sound.unlock();
+  assert.equal(calls, 2, "the next gesture retries even though the first resume is still pending");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(sound.running, true);
+  assert.equal(sound.pendingResume, 0);
+  assert.equal(sound.play("jump"), true);
+});
+
+test("an older resume settling does not clear a newer pending attempt", async () => {
+  let settleFirst;
+  const context = fakeContext();
+  const pending = [new Promise((resolve) => { settleFirst = resolve; }), new Promise(() => {})];
+  context.resume = () => pending.shift();
+  const sound = new Sound({ createContext: () => context, now: () => 0 });
+  sound.unlock();
+  sound.unlock();
+  settleFirst();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(sound.pendingResume, 2);
+  assert.equal(sound.resuming, true);
 });
