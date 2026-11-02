@@ -96,13 +96,21 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .toolbar-actions button { display: flex; align-items: center; gap: 7px; background: transparent; font-size: 11px; color: #737e65; padding: 3px; min-height: 25px; }
 .toolbar-actions svg { width: 17px; height: 17px; }
 .toolbar-divider { height: 16px; background: #ced4bf; width: 1px; }
-.touch-controls { display: none; justify-content: space-between; align-items: center; padding: 10px 14px; gap: 15px; background: #e2e7d2; }
-.touch-controls button { width: 52px; min-height: 45px; border: 1px solid #afba9b; border-bottom: 3px solid #a2af8f; border-radius: 5px; background: #f5f5e8; font: 23px var(--mono); touch-action: none; user-select: none; -webkit-user-select: none; }
-.touch-controls button:active, .touch-controls button.pressed { transform: translateY(2px); border-bottom-width: 1px; background: #d3ddbe; }
-.direction-buttons { display: flex; gap: 9px; }
-.touch-controls > span { font: 7px var(--mono); color: #7f8b6d; text-align: center; letter-spacing: 1px; }
-.touch-controls button.touch-jump { font: 700 12px var(--mono); width: 90px; background: #f1d1ac; border-color: #cda879; color: #916238; }
-.touch-jump span { padding-left: 7px; font-size: 17px; }
+.touch-controls { display: none; justify-content: space-between; align-items: center; padding: 12px max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left)); gap: 12px; background: #e2e7d2; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.touch-ui .touch-controls { display: flex; }
+.paw-button { position: relative; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 2px solid #8f6b4c; border-bottom-width: 5px; border-radius: 50% 50% 46% 46%; background: #f6ead6; color: #6e4a31; touch-action: none; transition: background .08s; }
+.paw-button .paw { width: 40px; height: 40px; pointer-events: none; transition: transform .08s ease-out; }
+.paw-arrow { fill: #fbecd6; }
+.paw-button.pressed { border-bottom-width: 2px; background: #e9cfa8; }
+/* Pressed looks follow the hit-tested action (.pressed), not :active, which sticks to the first paw a captured finger touched. Only the artwork squishes, so the button box used for hit-testing stays put. */
+.paw-button.pressed .paw { transform: translateY(2px) scale(.9); }
+.direction-buttons { display: flex; gap: 12px; }
+.touch-tagline { font: 7px var(--mono); color: #7f8b6d; text-align: center; letter-spacing: 1px; }
+.paw-button.touch-jump { width: 82px; height: 82px; background: #f1b98f; border-color: #a9532f; color: #7b3417; }
+.touch-jump .paw { width: 44px; height: 44px; margin-top: -8px; }
+.touch-jump .paw-arrow { fill: #ffd9b8; }
+.touch-label { position: absolute; bottom: 7px; left: 0; right: 0; font: 700 9px var(--mono); letter-spacing: 1.5px; pointer-events: none; }
+.paw-button.touch-jump.pressed { background: #e8996a; }
 .adventure-strip { margin-top: 34px; display: flex; align-items: center; gap: 33px; }
 .adventure-heading { flex-shrink: 0; }
 .adventure-heading .eyebrow { font-size: 8px; color: #939984; letter-spacing: 1.1px; }
@@ -208,7 +216,6 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
   .in-game-label { top: 9px; left: 9px; font-size: 6px; padding: 5px 6px; letter-spacing: .4px; }
   .in-game-label .status-dot { width: 4px; height: 4px; }
   .game-toast { bottom: 10px; padding: 7px 10px; font-size: 8px; }
-  .touch-controls { display: flex; }
   .game-toolbar { padding: 8px 11px; min-height: 39px; }
   .keyboard-legend { gap: 12px; }
   .keyboard-legend > span { font-size: 9px; }
@@ -247,11 +254,35 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
   .trail { gap: 5px; padding: 10px 6px; }
   .trail strong { font-size: 8px; }
   .trail-icon { font-size: 18px; }
+  .touch-tagline { display: none; }
+  .paw-button { width: 58px; height: 58px; }
+  .paw-button.touch-jump { width: 74px; height: 74px; }
 }
-@media (pointer: coarse) {
-  .touch-controls { display: flex; }
-  .game-shell:fullscreen .viewport { width: min(100%, calc((100dvh - 185px) * 1.875)); }
+.touch-ui .game-shell:fullscreen .viewport { width: min(100%, calc((100dvh - 215px) * 1.875)); }
+/* Short landscape phones: paws sit beside the canvas so the HUD, game, and controls fit on one screen. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .touch-ui .game-shell { display: grid; grid-template-columns: 96px minmax(0, 1fr) 108px; grid-template-areas: "hud hud hud" "move view jump" "bar bar bar"; background: #e2e7d2; }
+  .touch-ui .game-hud { grid-area: hud; background: #263d31; min-height: 48px; padding-block: 6px; }
+  .touch-ui .game-toolbar { grid-area: bar; min-height: 34px; padding-block: 5px; }
+  .touch-ui .viewport { grid-area: view; justify-self: center; width: min(100%, calc((100dvh - 92px) * 1.875)); }
+  .touch-ui .touch-controls { display: contents; }
+  .touch-ui .direction-buttons { grid-area: move; align-self: center; justify-self: center; flex-direction: column; padding-left: env(safe-area-inset-left); }
+  .touch-ui .touch-jump { grid-area: jump; align-self: center; justify-self: center; margin-right: env(safe-area-inset-right); }
+  .touch-ui .touch-tagline { display: none; }
+  .touch-ui .paw-button { width: 60px; height: 60px; }
+  .touch-ui .paw-button.touch-jump { width: 76px; height: 76px; }
+  .touch-ui .game-shell:fullscreen { display: grid; align-content: center; }
+  .touch-ui .game-shell:fullscreen .viewport { width: min(100%, calc((100dvh - 92px) * 1.875)); }
+  .touch-ui .game-shell:fullscreen .game-hud, .touch-ui .game-shell:fullscreen .game-toolbar { width: 100%; }
+  .touch-ui .overlay { padding: 8px; }
+  .touch-ui .overlay-card { padding: 10px 14px; width: 280px; }
+  .touch-ui .overlay-pup, .touch-ui .overlay-hint, .touch-ui .overlay:not(.ready) .overlay-kicker { display: none; }
+  .touch-ui .overlay h2 { font-size: 17px; margin: 6px 0; }
+  .touch-ui .overlay p { font-size: 10px; margin-bottom: 10px; line-height: 1.5; }
+  .touch-ui .overlay .primary-button { padding: 8px 18px; min-height: 36px; font-size: 11px; }
+  .touch-ui .result-stats { margin-bottom: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+  .paw-button.pressed .paw { transform: none; }
 }
