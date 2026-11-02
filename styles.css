@@ -101,9 +101,9 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .paw-button { position: relative; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 2px solid #8f6b4c; border-bottom-width: 5px; border-radius: 50% 50% 46% 46%; background: #f6ead6; color: #6e4a31; touch-action: none; transition: background .08s; }
 .paw-button .paw { width: 40px; height: 40px; pointer-events: none; transition: transform .08s ease-out; }
 .paw-arrow { fill: #fbecd6; }
-.paw-button:active, .paw-button.pressed { border-bottom-width: 2px; background: #e9cfa8; }
-/* Squish only the artwork: the button's own box stays put so touch hit-testing is stable. */
-.paw-button:active .paw, .paw-button.pressed .paw { transform: translateY(2px) scale(.9); }
+.paw-button.pressed { border-bottom-width: 2px; background: #e9cfa8; }
+/* Pressed looks follow the hit-tested action (.pressed), not :active, which sticks to the first paw a captured finger touched. Only the artwork squishes, so the button box used for hit-testing stays put. */
+.paw-button.pressed .paw { transform: translateY(2px) scale(.9); }
 .direction-buttons { display: flex; gap: 12px; }
 .touch-tagline { font: 7px var(--mono); color: #7f8b6d; text-align: center; letter-spacing: 1px; }
 .paw-button.touch-jump { width: 82px; height: 82px; background: #f1b98f; border-color: #a9532f; color: #7b3417; }
@@ -284,5 +284,5 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
-  .paw-button:active .paw, .paw-button.pressed .paw { transform: none; }
+  .paw-button.pressed .paw { transform: none; }
 }
