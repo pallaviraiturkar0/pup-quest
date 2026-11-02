@@ -531,6 +531,85 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     ctx.restore();
   }
 
+  function facing(enemy) {
+    ctx.save();
+    ctx.translate(Math.round(enemy.x), Math.round(enemy.y));
+    if (enemy.direction < 0) { ctx.translate(enemy.w, 0); ctx.scale(-1, 1); }
+  }
+
+  function vacuum(enemy, time) {
+    const alert = enemy.mode === "windup" || enemy.mode === "dash";
+    if (enemy.mode === "dash") {
+      ctx.globalAlpha = 0.5;
+      for (let i = 0; i < 3; i += 1) rect(enemy.x + enemy.w / 2 - enemy.direction * (14 + i * 5), enemy.y + 5 - i, 3, 3, "#d8d6a4");
+      ctx.globalAlpha = 1;
+    }
+    facing(enemy);
+    const shake = enemy.mode === "windup" ? Math.floor(time * 40) % 2 : 0;
+    rect(1, 3, 18, 6, "#3d4250");
+    rect(3, 1 + shake, 14, 3, "#6c7488");
+    rect(5, 0 + shake, 10, 2, "#8d96aa");
+    rect(17, 4, 3, 4, "#e2cda1");
+    const blink = Math.floor(time * (alert ? 12 : 2)) % 2;
+    rect(13, 1 + shake, 2, 1, alert ? (blink ? "#ff5a4f" : "#ffb0a0") : blink ? "#7fe08a" : "#3e8c4a");
+    rect(4, 8, 3, 1, "#1d2028");
+    rect(13, 8, 3, 1, "#1d2028");
+    ctx.restore();
+  }
+
+  function seagull(enemy, time) {
+    if (enemy.swooping || enemy.warning) {
+      const closeness = 1 - (enemy.floor - enemy.y - enemy.h) / 64;
+      ctx.globalAlpha = 0.12 + 0.25 * Math.max(0, closeness);
+      rect(enemy.x + 2, enemy.floor - 2, enemy.w - 4, 2, "#2f3b3f");
+      ctx.globalAlpha = 1;
+    }
+    facing(enemy);
+    const flap = enemy.swooping ? 0 : Math.floor(time * 8) % 2;
+    rect(3, 4, 11, 4, "#f4f1e6");
+    rect(12, 2, 4, 4, "#f4f1e6");
+    rect(14, 3, 1, 1, "#22282a");
+    rect(16, 4, 2, 1, "#f2b33d");
+    rect(1, 5, 3, 2, "#c9cfd2");
+    if (enemy.swooping) {
+      rect(2, 2, 10, 2, "#9aa4aa");
+      rect(6, 8, 1, 2, "#e08a3c");
+      rect(9, 8, 1, 2, "#e08a3c");
+    } else {
+      rect(4, flap ? 0 : 6, 8, 2, "#9aa4aa");
+      rect(5, flap ? 2 : 6, 5, 2, "#c9cfd2");
+    }
+    if (enemy.warning) rect(16, 0, 1, 2, "#ffedb2");
+    ctx.restore();
+  }
+
+  function cat(enemy, time) {
+    facing(enemy);
+    const crouch = enemy.mode === "crouch" ? 3 : 0;
+    const leap = enemy.mode === "pounce";
+    const body = "#4a4554";
+    const tailWave = Math.floor(time * 4) % 2;
+    rect(0, 1 + tailWave, 2, 6 - tailWave, body);
+    rect(2, 4 + crouch, 12, 6 - crouch, body);
+    rect(11, 1 + crouch, 7, 6, body);
+    rect(12, -1 + crouch, 2, 2, body);
+    rect(16, -1 + crouch, 2, 2, body);
+    rect(15, 3 + crouch, 1, 1, crouch ? "#ffe45c" : "#b6f06a");
+    rect(17, 3 + crouch, 1, 1, crouch ? "#ffe45c" : "#b6f06a");
+    rect(17, 5 + crouch, 1, 1, "#e99aa8");
+    if (leap) {
+      rect(0, 8, 4, 2, body);
+      rect(14, 7, 4, 2, body);
+    } else {
+      const step = crouch ? 0 : Math.floor(time * 7) % 2;
+      rect(3 + step, 10, 2, 2, body);
+      rect(12 - step, 10, 2, 2, body);
+    }
+    ctx.restore();
+  }
+
+  const CRITTERS = { squirrel: critter, vacuum, seagull, cat };
+
   function effect(type, x, y) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     const dust = type === "jump";
@@ -583,7 +662,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       if (!treat.collected && treat.x > game.cameraX - 12 && treat.x < game.cameraX + VIEW_WIDTH + 12) bone(treat.x, treat.y, decorativeTime);
     }
     if (!game.keyFound) goldenKey(game.level.key.x, game.level.key.y, decorativeTime);
-    for (const enemy of game.level.enemies) if (enemy.alive) critter(enemy, decorativeTime);
+    for (const enemy of game.level.enemies) if (enemy.alive) (CRITTERS[enemy.type] ?? critter)(enemy, decorativeTime);
     if (game.player.grounded || game.status === "ready") {
       ctx.globalAlpha = 0.15;
       rect(game.player.x - 3, game.player.y + game.player.h - 1, 21, 3, "#394c39");

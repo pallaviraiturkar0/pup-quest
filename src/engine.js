@@ -1,3 +1,4 @@
+import { updateEnemy } from "./enemies.js";
 import { LEVELS, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
 
 export const PHYSICS = Object.freeze({
@@ -146,15 +147,13 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   }
   for (const enemy of level.enemies) {
     if (!enemy.alive) continue;
-    enemy.x += enemy.speed * enemy.direction * dt;
-    if (enemy.x >= enemy.right) { enemy.x = enemy.right; enemy.direction = -1; }
-    if (enemy.x <= enemy.left) { enemy.x = enemy.left; enemy.direction = 1; }
+    updateEnemy(enemy, dt, p);
     if (!intersects(p, enemy)) continue;
     if (p.vy > 0 && previousBottom <= enemy.y + 5) {
       enemy.alive = false;
       p.vy = -190;
       game.score += 10;
-      game.events.push({ type: "stomp", x: enemy.x + 9, y: enemy.y });
+      game.events.push({ type: "stomp", x: enemy.x + enemy.w / 2, y: enemy.y });
     } else if (loseLife(game, "enemy")) return;
   }
 

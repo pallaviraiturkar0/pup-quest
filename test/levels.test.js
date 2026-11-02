@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { enemyReach } from "../src/enemies.js";
 import { intersects, PHYSICS } from "../src/engine.js";
 import { GROUND_Y, LEVELS, VIEW_HEIGHT } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
@@ -112,7 +113,7 @@ test("the spawn point is clear of solids, spikes, and critters, and stands on gr
     const puppy = { ...level.start, ...PUPPY };
     assert.ok(solids(level).every((solid) => !intersects(puppy, solid)), `${level.name}: spawn overlaps a solid`);
     assert.ok(level.spikes.every((spike) => !intersects(puppy, spike)), `${level.name}: spawn overlaps spikes`);
-    assert.ok(level.enemies.every((enemy) => !intersects(puppy, { ...enemy, x: enemy.left, w: enemy.right - enemy.left + enemy.w })),
+    assert.ok(level.enemies.every((enemy) => !intersects(puppy, enemyReach(enemy))),
       `${level.name}: spawn is inside a critter patrol`);
     assert.equal(level.start.y + PUPPY.h, GROUND_Y, `${level.name}: spawn is not standing on ground`);
   }
@@ -131,11 +132,26 @@ test("hazards sit on solid ground and critters never wander out over water", () 
     for (const spike of level.spikes) {
       assert.ok(level.ground.some((ground) => spike.x >= ground.x && spike.x + spike.w <= ground.x + ground.w), `${level.name}: spike at ${spike.x} floats over a gap`);
     }
-    for (const enemy of level.enemies) {
-      const [from, to] = [enemy.left + enemy.w / 2, enemy.right + enemy.w / 2];
-      assert.ok(level.ground.some((ground) => from >= ground.x && to <= ground.x + ground.w), `${level.name}: critter at ${enemy.x} patrols over a gap`);
+    for (const enemy of level.enemies.filter((critter) => critter.type !== "seagull")) {
+      // Walkers keep their whole hitbox on the ground or rooftop they patrol.
+      const [from, to] = enemy.floor === GROUND_Y
+        ? [enemy.left + enemy.w / 2, enemy.right + enemy.w / 2]
+        : [enemy.left, enemy.right + enemy.w];
+      assert.ok(solids(level).some((solid) => solid.y === enemy.floor && from >= solid.x && to <= solid.x + solid.w),
+        `${level.name}: ${enemy.type} at ${enemy.x} patrols over a gap`);
     }
     assert.ok(level.start.x < level.checkpoint.x && level.checkpoint.x < level.exit.x, `${level.name}: checkpoint is out of order`);
+  }
+});
+
+test("each new trail introduces its own critter, and only the new trails use them", () => {
+  const types = (level) => new Set(level.enemies.map((enemy) => enemy.type));
+  for (const level of LEVELS.slice(0, 3)) assert.deepEqual([...types(level)], ["squirrel"], `${level.name} should keep its squirrels`);
+  assert.ok(types(LEVELS[3]).has("vacuum"), "Puppy Park needs robot vacuums");
+  assert.ok(types(LEVELS[4]).has("seagull"), "Seashell Shore needs seagulls");
+  assert.ok(types(LEVELS[5]).has("cat"), "Neon Nightwalk needs rooftop cats");
+  for (const cat of LEVELS[5].enemies.filter((enemy) => enemy.type === "cat")) {
+    assert.ok(cat.floor < GROUND_Y, "cats prowl rooftops, not the street");
   }
 });
 
