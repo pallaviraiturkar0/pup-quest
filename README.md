@@ -10,10 +10,19 @@ Run, jump, collect treats, and find the golden key to open the doghouse. Explore
 
 | Action | Keyboard | Phone / tablet |
 | --- | --- | --- |
-| Move | Left / Right or A / D | Hold the arrow buttons |
-| Jump | Space, Up, or W | Hold JUMP |
+| Move | Left / Right or A / D | Hold the left / right paw |
+| Jump | Space, Up, or W | Hold the JUMP paw |
 | Pause / resume | Escape or P | Pause button |
 | Restart adventure | R while paused | Restart adventure in the pause menu |
+
+### Touch controls
+
+On phones and tablets, three paw-print buttons appear under the game (or beside it on short landscape screens). They only show on touch devices: a coarse pointer, a touchscreen, or the first real touch on a hybrid laptop. Keyboard play is unchanged.
+
+- **Multi-touch:** hold a direction paw with one thumb and tap JUMP with the other to run and jump at the same time.
+- **Slide between paws:** roll a thumb from left to right (or onto JUMP) without lifting it. A thumb that drifts a little off a paw keeps its action until it lands on another paw or lifts.
+- The paws are pixel art drawn procedurally as inline SVG by `src/touch.js`; there are no image files. With reduced motion turned on, pressed paws change colour instead of squishing.
+- On small screens the canvas scales to the page width. On short landscape phones, the paws move to either side of the canvas and the canvas shrinks so the HUD, game, and controls fit on one screen.
 
 Hold jump for a higher leap; tap for a short hop. Jump on critters to bounce off them, and avoid spikes and water. Each new trail adds a critter with its own tell: Puppy Park's **robot vacuums** flash red and rev up before dashing at a pup ahead of them, Seashell Shore's **seagulls** glide overhead and swoop down to puppy height (watch their shadow), and Neon Nightwalk's **alley cats** prowl rooftops, crouch, then pounce. Orange checkpoint flags save your position for the current trail. You start with three hearts and recover one on each new trail. Treats are optional; the golden key is required.
 
@@ -47,7 +56,7 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. A full-campaign input replay also checks that all six trails can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. A full-campaign input replay also checks that all six trails can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
@@ -58,8 +67,9 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 - `src/themes.js`: data-driven backdrops (palette, parallax layers, and ground decor) picked by each level's `theme`.
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
 - `src/audio.js`: short, original sound effects generated with Web Audio.
-- `src/main.js`: keyboard/multi-touch controls, menus, accessibility announcements, and saved scores.
-- `styles.css`: responsive game page, with reduced-motion and fullscreen support.
+- `src/touch.js`: touch-to-action logic (pointer tracking, paw hit-testing, touch-device detection) and the procedural paw-print button art, kept DOM-free so it runs under node tests.
+- `src/main.js`: keyboard controls, wiring for the touch paws, menus, accessibility announcements, and saved scores.
+- `styles.css`: responsive game page and touch layouts, with reduced-motion and fullscreen support.
 
 No frameworks, downloaded assets, trackers, analytics, external fonts, backend, or paid services.
 

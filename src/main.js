@@ -3,6 +3,10 @@ import { LEVELS } from "./levels.js";
 import { createRenderer } from "./render.js";
 import { themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
+import {
+  actionAt, clearTouches, createTouchState, pawPrintSvg, pointerDown, pointerMove, pointerUp,
+  shouldShowTouchControls, touchInput,
+} from "./touch.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("game-canvas");
@@ -10,7 +14,11 @@ const renderer = createRenderer(canvas, { themeOverride: themeOverrideFromSearch
 const sound = new Sound();
 export const game = createGame();
 const heldKeys = new Set();
-const pointers = new Map();
+const touch = createTouchState();
+const touchControls = document.querySelector(".touch-controls");
+const touchButtons = [...touchControls.querySelectorAll("[data-control]")];
+const coarsePointer = matchMedia("(pointer: coarse)");
+let touchSeen = false;
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const controlMap = { ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", Space: "jump", ArrowUp: "jump", KeyW: "jump" };
 let jumpQueued = false;
@@ -62,9 +70,33 @@ const timeLabel = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(
 
 function clearInput() {
   heldKeys.clear();
-  pointers.clear();
+  clearTouches(touch);
   jumpQueued = false;
-  document.querySelectorAll("[data-control]").forEach((button) => button.classList.remove("pressed"));
+  syncTouchButtons();
+}
+
+function syncTouchButtons() {
+  const held = touchInput(touch);
+  for (const button of touchButtons) {
+    const action = button.dataset.control;
+    button.classList.toggle("pressed", action === "jump" ? held.jumpHeld : held[action]);
+  }
+}
+
+function usingTouch() {
+  return shouldShowTouchControls({ coarsePointer: coarsePointer.matches, maxTouchPoints: navigator.maxTouchPoints, touchSeen });
+}
+
+function updateTouchVisibility() {
+  const show = usingTouch();
+  if (document.documentElement.classList.contains("touch-ui") === show) return;
+  document.documentElement.classList.toggle("touch-ui", show);
+  $("overlay-hint").textContent = overlayHint();
+}
+
+function overlayHint() {
+  if (usingTouch()) return "HOLD A PAW + TAP JUMP TO LEAP";
+  return game.status === "paused" ? "ESC TO RESUME · R TO RESTART" : "ARROWS TO MOVE · SPACE TO JUMP";
 }
 
 function focusGame() {
@@ -135,9 +167,7 @@ function syncOverlay() {
   arrow.textContent = "→";
   $("primary-button").replaceChildren(document.createTextNode(action), arrow);
   $("secondary-button").hidden = game.status !== "paused";
-  $("overlay-hint").textContent = matchMedia("(pointer: coarse)").matches
-    ? "HOLD AN ARROW + TAP JUMP TO LEAP"
-    : game.status === "paused" ? "ESC TO RESUME · R TO RESTART" : "ARROWS TO MOVE · SPACE TO JUMP";
+  $("overlay-hint").textContent = overlayHint();
   setResultStats(["level-complete", "game-over", "won"].includes(game.status)
     ? [["TREATS", game.status === "level-complete" ? `${game.levelTreats}/${game.level.treats.length}` : String(game.totalTreats)], ["SCORE", String(game.score)], ["TIME", timeLabel(game.status === "level-complete" ? game.levelTime : game.elapsed)]]
     : []);
@@ -256,28 +286,48 @@ window.addEventListener("keyup", (event) => {
   if (controlMap[event.code] && game.status === "playing" && !$("help-dialog").open) event.preventDefault();
 });
 
-document.querySelectorAll("[data-control]").forEach((button) => {
-  button.addEventListener("pointerdown", (event) => {
-    if (game.status !== "playing") return;
-    event.preventDefault();
-    button.setPointerCapture(event.pointerId);
-    pointers.set(event.pointerId, button.dataset.control);
-    if (button.dataset.control === "jump") jumpQueued = true;
-    button.classList.add("pressed");
-    unlockAudio();
-    focusGame();
-  });
-  const release = (event) => {
-    pointers.delete(event.pointerId);
-    if (![...pointers.values()].includes(button.dataset.control)) button.classList.remove("pressed");
-  };
-  button.addEventListener("pointerup", release);
-  button.addEventListener("pointercancel", release);
-  button.addEventListener("lostpointercapture", release);
+for (const button of touchButtons) {
+  button.insertAdjacentHTML("afterbegin", pawPrintSvg(button.dataset.control));
   button.addEventListener("click", (event) => {
     if (event.detail === 0 && button.dataset.control === "jump" && game.status === "playing") jumpQueued = true;
   });
+}
+
+const touchZones = () => touchButtons.map((button) => {
+  const { left, top, right, bottom } = button.getBoundingClientRect();
+  return { action: button.dataset.control, left, top, right, bottom };
 });
+
+touchControls.addEventListener("pointerdown", (event) => {
+  const button = event.target instanceof Element ? event.target.closest("[data-control]") : null;
+  if (!button || game.status !== "playing") return;
+  event.preventDefault();
+  // Capture keeps this finger's moves and release coming here even after it slides off a paw.
+  button.setPointerCapture(event.pointerId);
+  if (pointerDown(touch, event.pointerId, button.dataset.control)) jumpQueued = true;
+  syncTouchButtons();
+  unlockAudio();
+  focusGame();
+});
+touchControls.addEventListener("pointermove", (event) => {
+  if (!touch.pointers.has(event.pointerId)) return;
+  if (pointerMove(touch, event.pointerId, actionAt(touchZones(), event.clientX, event.clientY))) jumpQueued = true;
+  syncTouchButtons();
+});
+for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+  touchControls.addEventListener(type, (event) => {
+    pointerUp(touch, event.pointerId);
+    syncTouchButtons();
+  });
+}
+touchControls.addEventListener("contextmenu", (event) => event.preventDefault());
+
+window.addEventListener("pointerdown", (event) => {
+  if (event.pointerType !== "touch" || touchSeen) return;
+  touchSeen = true;
+  updateTouchVisibility();
+}, { capture: true, passive: true });
+coarsePointer.addEventListener("change", updateTouchVisibility);
 
 function suspendGame() {
   clearInput();
@@ -339,6 +389,7 @@ document.addEventListener("fullscreenchange", () => {
   $("fullscreen-button").setAttribute("aria-label", document.fullscreenElement ? "Exit fullscreen" : "Enter fullscreen");
 });
 updateSoundButton();
+updateTouchVisibility();
 updateUi();
 
 let previousTime = performance.now();
@@ -349,8 +400,9 @@ function frame(now) {
   if (game.status === "playing") {
     accumulator += delta;
     while (accumulator >= 1 / 120) {
-      const active = (action) => [...heldKeys].some((key) => controlMap[key] === action) || [...pointers.values()].includes(action);
-      stepGame(game, { left: active("left"), right: active("right"), jumpHeld: active("jump"), jumpPressed: jumpQueued }, 1 / 120);
+      const held = touchInput(touch);
+      const key = (action) => [...heldKeys].some((code) => controlMap[code] === action);
+      stepGame(game, { left: key("left") || held.left, right: key("right") || held.right, jumpHeld: key("jump") || held.jumpHeld, jumpPressed: jumpQueued }, 1 / 120);
       jumpQueued = false;
       accumulator -= 1 / 120;
     }
