@@ -263,7 +263,7 @@ window.addEventListener("keydown", (event) => {
     if (!event.repeat) toggleSound();
     return;
   }
-  unlockAudio();
+  if (!event.repeat) unlockAudio();
   if (["Escape", "KeyP"].includes(event.code) && ["playing", "paused"].includes(game.status)) {
     event.preventDefault();
     if (!event.repeat) togglePause();

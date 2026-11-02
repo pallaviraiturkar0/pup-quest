@@ -139,8 +139,10 @@ export class Sound {
       if (this.context.state === "suspended") {
         const attempt = ++this.resumeAttempt;
         const resumed = this.context.resume();
+        // The grace window opens once per stretch of pending resumes, so a
+        // stream of retries (like held keys) cannot keep extending it.
+        if (this.pendingResume === 0) this.resumeStartedAt = this.now();
         this.pendingResume = attempt;
-        this.resumeStartedAt = this.now();
         Promise.resolve(resumed).catch(() => {}).finally(() => {
           if (this.pendingResume === attempt) this.pendingResume = 0;
         });

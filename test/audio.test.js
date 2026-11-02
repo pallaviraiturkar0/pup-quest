@@ -196,3 +196,21 @@ test("an older resume settling does not clear a newer pending attempt", async ()
   assert.equal(sound.pendingResume, 2);
   assert.equal(sound.resuming, true);
 });
+
+test("repeated gestures during a stuck resume do not extend the grace window", () => {
+  let clock = 0;
+  const context = fakeContext();
+  let calls = 0;
+  context.resume = () => { calls += 1; return new Promise(() => {}); };
+  const sound = new Sound({ createContext: () => context, now: () => clock });
+  sound.unlock();
+  for (let i = 0; i < 10; i += 1) {
+    clock += RESUME_GRACE_MS / 2;
+    sound.unlock();
+  }
+  assert.equal(calls, 11, "each gesture still retries");
+  assert.equal(sound.resuming, false);
+  const scheduled = context.log.filter((entry) => entry[0] === "start").length;
+  assert.equal(sound.play("jump"), false);
+  assert.equal(context.log.filter((entry) => entry[0] === "start").length, scheduled, "nothing accumulates on the stopped clock");
+});
