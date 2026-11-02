@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, nextLevel, PHYSICS, startGame, stepGame } from "../src/engine.js";
+import { MAX_LIVES } from "../src/powerups.js";
 
 // These waypoints use only ordinary movement and jumps, never teleportation.
 // Each tuple is [destination x, landing surface y, jump].
@@ -99,6 +100,7 @@ test("a real-input playthrough reaches every golden key and wins all six trails 
     }
   }
   assert.equal(game.deaths, 0);
-  assert.equal(game.lives, 3);
+  // Bone treats along the route top the pup up to the heart cap.
+  assert.equal(game.lives, MAX_LIVES);
   assert.ok(game.totalTreats > 0);
 });

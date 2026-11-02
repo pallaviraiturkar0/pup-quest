@@ -1,5 +1,6 @@
 import { updateEnemy } from "./enemies.js";
 import { LEVELS, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
+import { applyPowerup, isScared, PICKUP_RADIUS, speedMultiplier, tickPlayerPowerups, tickScared } from "./powerups.js";
 
 export const PHYSICS = Object.freeze({
   speed: 112,
@@ -20,7 +21,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const approach = (value, target, amount) => value < target ? Math.min(value + amount, target) : Math.max(value - amount, target);
 
 function playerAt(x, y) {
-  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, coyote: 0, buffer: 0, invincible: 0, stride: 0 };
+  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0 };
 }
 
 function loadLevel(game) {
@@ -57,7 +58,8 @@ export function restartGame(game) {
 export function nextLevel(game) {
   if (game.status !== "level-complete") return;
   game.levelIndex += 1;
-  game.lives = Math.min(3, game.lives + 1);
+  // Hearts from bone treats above three carry over to the next trail.
+  game.lives = Math.max(game.lives, Math.min(3, game.lives + 1));
   loadLevel(game);
   game.status = "playing";
   game.events.push({ type: "start" });
@@ -102,11 +104,12 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   game.levelTime += dt;
   game.exitHintCooldown = Math.max(0, game.exitHintCooldown - dt);
   p.invincible = Math.max(0, p.invincible - dt);
+  tickPlayerPowerups(p, dt);
   p.coyote = p.grounded ? PHYSICS.coyoteTime : Math.max(0, p.coyote - dt);
   p.buffer = input.jumpPressed ? PHYSICS.jumpBuffer : Math.max(0, p.buffer - dt);
 
   const direction = Number(Boolean(input.right)) - Number(Boolean(input.left));
-  p.vx = approach(p.vx, direction * PHYSICS.speed, PHYSICS.acceleration * dt);
+  p.vx = approach(p.vx, direction * PHYSICS.speed * speedMultiplier(p), PHYSICS.acceleration * dt);
   if (direction) p.facing = direction;
   if (p.buffer > 0 && p.coyote > 0) {
     p.vy = -PHYSICS.jump;
@@ -147,14 +150,14 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   }
   for (const enemy of level.enemies) {
     if (!enemy.alive) continue;
-    updateEnemy(enemy, dt, p);
+    if (!tickScared(enemy, dt)) updateEnemy(enemy, dt, p);
     if (!intersects(p, enemy)) continue;
     if (p.vy > 0 && previousBottom <= enemy.y + 5) {
       enemy.alive = false;
       p.vy = -190;
       game.score += 10;
       game.events.push({ type: "stomp", x: enemy.x + enemy.w / 2, y: enemy.y });
-    } else if (loseLife(game, "enemy")) return;
+    } else if (!isScared(enemy) && loseLife(game, "enemy")) return;
   }
 
   for (const treat of level.treats) {
@@ -165,6 +168,9 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
       game.score += 25;
       game.events.push({ type: "treat", x: treat.x, y: treat.y });
     }
+  }
+  for (const item of level.powerups) {
+    if (!item.collected && nearPickup(p, item, PICKUP_RADIUS)) applyPowerup(game, item);
   }
   if (!game.keyFound && nearPickup(p, level.key, 9)) {
     game.keyFound = true;

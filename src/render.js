@@ -410,6 +410,54 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     rect(x + 4, y - 3, 1, 1, "#fff4ca");
   }
 
+  // A big bone treat with a little heart: one extra heart.
+  function boneTreat(x, y, time) {
+    y += Math.sin(time * 3 + x) * 1.6;
+    ctx.globalAlpha = 0.2;
+    rect(x - 10, y - 8, 20, 15, "#ffd0d6");
+    ctx.globalAlpha = 1;
+    rect(x - 9, y - 4, 5, 8, "#b89254");
+    rect(x + 4, y - 4, 5, 8, "#b89254");
+    rect(x - 5, y - 2, 10, 4, "#b89254");
+    rect(x - 9, y - 5, 5, 7, "#fff1d0");
+    rect(x + 4, y - 5, 5, 7, "#fff1d0");
+    rect(x - 5, y - 3, 10, 3, "#fff1d0");
+    rect(x - 2, y - 2, 2, 1, "#e0505f");
+    rect(x + 1, y - 2, 2, 1, "#e0505f");
+    rect(x - 2, y - 1, 5, 1, "#e0505f");
+    rect(x - 1, y, 3, 1, "#e0505f");
+  }
+
+  // A lightning-bolt badge for the zoomies.
+  function zoomiesBadge(x, y, time) {
+    y += Math.sin(time * 5 + x) * 1.6;
+    const pulse = Math.floor(time * 6) % 2;
+    ctx.globalAlpha = 0.25 + pulse * 0.1;
+    rect(x - 8, y - 8, 16, 16, "#9fe3ff");
+    ctx.globalAlpha = 1;
+    rect(x - 6, y - 6, 12, 12, "#2f7fc1");
+    rect(x - 5, y - 5, 10, 10, "#4fb0ea");
+    polygon([[x + 1, y - 5], [x - 3, y + 1], [x, y + 1], [x - 1, y + 5], [x + 3, y - 1], [x, y - 1]], "#fff27a");
+  }
+
+  // A pink squeaky ball with little squeak marks.
+  function squeakyToy(x, y, time) {
+    const squish = Math.floor(time * 4) % 4 === 0 ? 1 : 0;
+    y += Math.sin(time * 3 + x) * 1.2;
+    rect(x - 5, y - 4 + squish, 10, 9 - squish, "#c94f7c");
+    rect(x - 4, y - 5 + squish, 8, 10 - squish, "#ef7aa6");
+    rect(x - 3, y - 4 + squish, 3, 2, "#ffc2d8");
+    rect(x - 1, y + 1, 2, 2, "#7a2e4d");
+    if (squish) {
+      rect(x - 9, y - 6, 2, 1, "#fff4ca");
+      rect(x + 7, y - 6, 2, 1, "#fff4ca");
+      rect(x - 8, y - 9, 1, 2, "#fff4ca");
+      rect(x + 7, y - 9, 1, 2, "#fff4ca");
+    }
+  }
+
+  const POWERUP_ART = { bone: boneTreat, zoomies: zoomiesBadge, squeaky: squeakyToy };
+
   function goldenKey(x, y, time) {
     y += Math.sin(time * 2.6) * 2;
     ctx.globalAlpha = 0.16;
@@ -467,8 +515,16 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     rect(flag.x, flag.y - 2, 10, 2, "#8c9066");
   }
 
-  function puppy(p, time, idle) {
+  function puppy(p, time, idle, decorativeTime = time) {
     if (p.invincible > 0 && Math.floor(time * 12) % 2 === 0) return;
+    if (p.zoomies > 0 && Math.abs(p.vx) > 15) {
+      ctx.globalAlpha = 0.6;
+      for (let i = 0; i < 3; i += 1) {
+        const length = 6 + ((Math.floor(decorativeTime * 20) + i) % 3) * 3;
+        rect(p.facing > 0 ? p.x - 4 - length : p.x + p.w + 4, p.y + 4 + i * 5, length, 1, "#9fe3ff");
+      }
+      ctx.globalAlpha = 1;
+    }
     const running = !idle && Math.abs(p.vx) > 15 && p.grounded;
     const step = running ? Math.floor(p.stride / 6) % 2 : 0;
     ctx.save();
@@ -662,13 +718,24 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       if (!treat.collected && treat.x > game.cameraX - 12 && treat.x < game.cameraX + VIEW_WIDTH + 12) bone(treat.x, treat.y, decorativeTime);
     }
     if (!game.keyFound) goldenKey(game.level.key.x, game.level.key.y, decorativeTime);
-    for (const enemy of game.level.enemies) if (enemy.alive) (CRITTERS[enemy.type] ?? critter)(enemy, decorativeTime);
+    for (const item of game.level.powerups ?? []) {
+      if (!item.collected && item.x > game.cameraX - 12 && item.x < game.cameraX + VIEW_WIDTH + 12) POWERUP_ART[item.type]?.(item.x, item.y, decorativeTime);
+    }
+    for (const enemy of game.level.enemies) {
+      if (!enemy.alive) continue;
+      const tremble = enemy.scared > 0 && !reducedMotion ? (Math.floor(time * 30) % 2 ? 1 : -1) : 0;
+      (CRITTERS[enemy.type] ?? critter)({ ...enemy, x: enemy.x + tremble }, decorativeTime);
+      if (enemy.scared > 0) {
+        rect(enemy.x + enemy.w / 2 - 1, enemy.y - 10, 2, 5, "#fff4ca");
+        rect(enemy.x + enemy.w / 2 - 1, enemy.y - 4, 2, 2, "#fff4ca");
+      }
+    }
     if (game.player.grounded || game.status === "ready") {
       ctx.globalAlpha = 0.15;
       rect(game.player.x - 3, game.player.y + game.player.h - 1, 21, 3, "#394c39");
       ctx.globalAlpha = 1;
     }
-    puppy(game.player, time, game.status === "ready");
+    puppy(game.player, time, game.status === "ready", decorativeTime);
     if (!reducedMotion) {
       for (const particle of particles) {
         if (game.status === "playing") {

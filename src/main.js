@@ -157,7 +157,7 @@ function updateUi() {
   const total = document.createElement("span");
   total.textContent = `/ ${game.level.treats.length}`;
   $("treat-count").append(total);
-  $("lives").innerHTML = [0, 1, 2].map((index) => heartMarkup(index >= game.lives)).join("");
+  $("lives").innerHTML = Array.from({ length: Math.max(3, game.lives) }, (_, index) => heartMarkup(index >= game.lives)).join("");
   $("lives").setAttribute("aria-label", `${game.lives} ${game.lives === 1 ? "life" : "lives"} remaining`);
   if (game.keyFound) $("objective").textContent = "KEY FOUND · FIND YOUR WAY HOME";
   if (game.score > bestScore) {
@@ -177,13 +177,20 @@ function updateUi() {
   syncOverlay();
 }
 
+const POWERUP_MESSAGES = {
+  bone: () => `Bone treat! ${game.lives} ${game.lives === 1 ? "heart" : "hearts"} now.`,
+  zoomies: () => "ZOOMIES! Super speed for a few seconds.",
+  squeaky: ({ scared }) => scared ? "SQUEAK! Nearby critters freeze in fright." : "SQUEAK! Nobody around to scare.",
+};
+
 function processEvents() {
   for (const event of game.events.splice(0)) {
     sound.play(event.type);
-    if (["jump", "treat", "key", "stomp", "hurt", "checkpoint"].includes(event.type) && !reducedMotion.matches) {
+    if (["jump", "treat", "key", "stomp", "hurt", "checkpoint", "powerup"].includes(event.type) && !reducedMotion.matches) {
       renderer.effect(event.type, event.x, event.y);
     }
     if (event.type === "key") toast("Golden key found! The doghouse is open.");
+    if (event.type === "powerup") toast(POWERUP_MESSAGES[event.powerup](event));
     if (event.type === "checkpoint") toast("Checkpoint! A safe spot for little paws.");
     if (event.type === "need-key") toast("The door is locked. Find the golden key first!");
     if (event.type === "hurt" && game.lives > 0) toast(`Whoops! ${game.lives} ${game.lives === 1 ? "heart" : "hearts"} left. You've got this.`);
