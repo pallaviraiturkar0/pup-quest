@@ -1,5 +1,5 @@
 import { GROUND_Y, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
-import { activeParticles, clearParticles, createParticles, emitForEvent, particleAlpha, SHAPE_PIXELS, updateParticles } from "./particles.js";
+import { activeParticles, calmParticles, clearParticles, createParticles, emitForEvent, particleAlpha, SHAPE_PIXELS, updateParticles } from "./particles.js";
 import { resolveColor, THEMES, themeForLevel } from "./themes.js";
 
 const noise = (n) => {
@@ -742,6 +742,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       ctx.globalAlpha = 1;
     }
     puppy(game.player, time, game.status === "ready", decorativeTime);
+    if (reducedMotion) calmParticles(particles);
     if (game.status !== "paused") updateParticles(particles, dt);
     for (const particle of activeParticles(particles)) drawParticle(particle);
     ctx.globalAlpha = 1;

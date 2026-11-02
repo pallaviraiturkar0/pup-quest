@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createGame, startGame, stepGame } from "../src/engine.js";
 import { GROUND_Y } from "../src/levels.js";
 import {
-  activeParticles, BURSTS, clearParticles, createParticles, emit, emitForEvent, EVENT_BURSTS, PARTICLE_CAP,
+  activeParticles, BURSTS, calmParticles, clearParticles, createParticles, emit, emitForEvent, EVENT_BURSTS, PARTICLE_CAP,
   particleAlpha, SHAPE_PIXELS, updateParticles,
 } from "../src/particles.js";
 import { createRenderer } from "../src/render.js";
@@ -141,4 +141,30 @@ test("the renderer draws pooled particles in every shape and keeps confetti fall
   renderer.clearEffects();
   assert.equal(activeParticles(renderer.particles).length, 0);
   assert.ok(Object.values(SHAPE_PIXELS).every((pixels) => pixels.length > 0));
+});
+
+test("turning on reduced motion mid-burst removes moving particles but keeps still sparkles", () => {
+  const system = createParticles({ random: seeded() });
+  emitForEvent(system, { type: "level-complete", x: 50, y: 50 });
+  const still = emitForEvent(system, { type: "treat", x: 50, y: 50 }, { reducedMotion: true });
+  calmParticles(system);
+  const left = activeParticles(system);
+  assert.equal(left.length, still);
+  assert.ok(left.every((particle) => particle.vx === 0 && particle.vy === 0 && particle.gravity === 0));
+
+  const noop = () => {};
+  const ctx = {
+    imageSmoothingEnabled: true, globalAlpha: 1, font: "", fillStyle: "",
+    fillRect: noop, beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop,
+    save: noop, restore: noop, translate: noop, scale: noop, fillText: noop,
+  };
+  const renderer = createRenderer({ getContext: () => ctx });
+  const game = createGame();
+  startGame(game);
+  renderer.effect({ type: "won", x: 200, y: 100 });
+  renderer.effect({ type: "treat", x: 200, y: 100 }, true);
+  renderer.render(game, 0, 1 / 60, true);
+  const remaining = activeParticles(renderer.particles);
+  assert.ok(remaining.length > 0);
+  assert.ok(remaining.every((particle) => particle.vx === 0 && particle.vy === 0), "only still sparkles are drawn");
 });

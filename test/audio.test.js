@@ -114,10 +114,6 @@ test("missing or broken Web Audio fails silently", () => {
   assert.doesNotThrow(() => throwing.unlock());
   assert.equal(throwing.play("stomp"), false);
 
-  const rejecting = fakeContext();
-  rejecting.resume = () => Promise.reject(new Error("not allowed"));
-  const sound = new Sound({ createContext: () => rejecting });
-  assert.equal(sound.unlock(), true);
 
   const broken = fakeContext({ state: "running" });
   broken.createOscillator = () => { throw new Error("nope"); };
@@ -138,4 +134,30 @@ test("missing or broken Web Audio fails silently", () => {
   } finally {
     if (original) globalThis.AudioContext = original;
   }
+});
+
+test("a context that stays suspended drops sounds instead of queuing them", async () => {
+  const context = fakeContext();
+  context.resume = () => Promise.reject(new Error("not allowed"));
+  const sound = new Sound({ createContext: () => context });
+  assert.equal(sound.unlock(), true);
+  assert.equal(sound.play("start"), true, "the gesture's own sound is scheduled while resume is pending");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(sound.resuming, false);
+  assert.equal(context.state, "suspended");
+  const scheduled = context.log.filter((entry) => entry[0] === "start").length;
+  for (const type of ["jump", "treat", "stomp", "hurt"]) assert.equal(sound.play(type), false, `${type} is dropped`);
+  assert.equal(context.log.filter((entry) => entry[0] === "start").length, scheduled, "nothing piles up on the stopped clock");
+
+  context.resume = function resume() { this.state = "running"; return Promise.resolve(); };
+  sound.unlock();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(sound.play("jump"), true, "a later gesture that resumes audio brings sound back");
+});
+
+test("a closed context never plays", () => {
+  const context = fakeContext({ state: "closed" });
+  const sound = new Sound({ createContext: () => context });
+  sound.unlock();
+  assert.equal(sound.play("jump"), false);
 });

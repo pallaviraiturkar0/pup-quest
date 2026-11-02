@@ -96,6 +96,7 @@ export class Sound {
     this.context = null;
     this.master = null;
     this.unavailable = false;
+    this.resuming = false;
     this.muted = this.#read() === "off";
   }
 
@@ -124,7 +125,11 @@ export class Sound {
         this.master.gain.value = MASTER_VOLUME;
         this.master.connect(this.context.destination);
       }
-      if (this.context.state === "suspended") Promise.resolve(this.context.resume()).catch(() => {});
+      if (this.context.state === "suspended" && !this.resuming) {
+        const resumed = this.context.resume();
+        this.resuming = true;
+        Promise.resolve(resumed).catch(() => {}).finally(() => { this.resuming = false; });
+      }
       return true;
     } catch {
       this.unavailable = true;
@@ -148,7 +153,10 @@ export class Sound {
 
   play(type) {
     const recipe = soundRecipe(type);
-    if (!recipe || this.muted || !this.context || this.context.state === "closed") return false;
+    // While a gesture's resume() is in flight the clock starts moments later, so
+    // those sounds still play. A context left suspended drops sounds instead of
+    // queuing them up for a burst on the next gesture.
+    if (!recipe || this.muted || !(this.running || this.resuming)) return false;
     try {
       scheduleRecipe(this.context, recipe, this.master);
       return true;

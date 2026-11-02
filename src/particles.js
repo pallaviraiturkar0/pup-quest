@@ -102,6 +102,14 @@ export function activeParticles(system) {
   return system.pool.filter((particle) => particle.alive);
 }
 
+// Removes particles that move, keeping still ones. Used when reduced motion is
+// switched on while bursts are already in flight.
+export function calmParticles(system) {
+  for (const particle of system.pool) {
+    if (particle.alive && (particle.vx !== 0 || particle.vy !== 0 || particle.gravity !== 0)) particle.alive = false;
+  }
+}
+
 export function clearParticles(system) {
   for (const particle of system.pool) particle.alive = false;
   system.cursor = 0;
