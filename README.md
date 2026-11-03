@@ -14,6 +14,7 @@ Run, jump, collect treats, and find the golden key to open the doghouse. Explore
 | Jump | Space, Up, or W | Hold the JUMP paw |
 | Pause / resume | Escape or P | Pause button |
 | Restart adventure | R while paused | Restart adventure in the pause menu |
+| Mute / unmute | M | Sound button in the toolbar |
 
 ### Touch controls
 
@@ -34,7 +35,13 @@ Every trail hides three dog-themed power-ups, all drawn procedurally:
 - **Zoomies** (a blue lightning badge): 1.5x running speed for 5 seconds. Losing a heart ends the zoomies.
 - **Squeaky toy** (a pink squeaky ball): critters within about 200 pixels freeze in fright for 4 seconds. Frozen critters can't hurt you, but you can still stomp them.
 
-Sound starts off and can be enabled in the game toolbar. Your personal best and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
+### Sound and particles
+
+Every sound is synthesized on the fly with the Web Audio API; there are no audio files. Biscuit's jumps chirp upward, treats twinkle, stomping a critter earns a playful "woof-woof" bark, power-ups sweep up a scale, getting hurt slides down, and finishing a trail plays a fanfare with a happy bark. Audio only starts after your first click, tap, or key press. Press **M** or use the sound button to mute; the choice is remembered. Browsers without Web Audio simply play silently.
+
+Small pixel particles add bounce: dust puffs when Biscuit lands hard or jumps, sparkles on treats, keys, checkpoints, and power-ups, paw prints when a critter is stomped, and confetti plus paw-print bursts at the doghouse. Particles live in a fixed pool (160 at most) so they never pile up. With **prefers-reduced-motion** turned on, moving particles are turned off and pickups show only a few still sparkles.
+
+Your personal best and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
 
 ## Run locally
 
@@ -56,7 +63,7 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. A full-campaign input replay also checks that all six trails can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. A full-campaign input replay also checks that all six trails can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
@@ -66,7 +73,8 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 - `src/powerups.js`: bone treat, zoomies, and squeaky toy rules (pickup, effects, and timers). Levels place them as `[type, column, y]` tuples.
 - `src/themes.js`: data-driven backdrops (palette, parallax layers, and ground decor) picked by each level's `theme`.
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
-- `src/audio.js`: short, original sound effects generated with Web Audio.
+- `src/audio.js`: procedural sound recipes (pure data) plus a small Web Audio adapter that handles gesture unlock, mute, and saved preference.
+- `src/particles.js`: capped, DOM-free particle pool with dust, sparkle, paw-print, and confetti bursts, and reduced-motion fallbacks.
 - `src/touch.js`: touch-to-action logic (pointer tracking, paw hit-testing, touch-device detection) and the procedural paw-print button art, kept DOM-free so it runs under node tests.
 - `src/main.js`: keyboard controls, wiring for the touch paws, menus, accessibility announcements, and saved scores.
 - `styles.css`: responsive game page and touch layouts, with reduced-motion and fullscreen support.
