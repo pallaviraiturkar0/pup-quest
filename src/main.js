@@ -1,3 +1,4 @@
+import { bossDefeated } from "./boss.js";
 import { createGame, nextLevel, pauseGame, restartGame, resumeGame, startGame, stepGame } from "./engine.js";
 import { LEVELS } from "./levels.js";
 import { createRenderer } from "./render.js";
@@ -122,6 +123,21 @@ function unlockAudio() {
   sound.unlock();
 }
 
+function objective() {
+  if (game.keyFound) return "KEY FOUND · FIND YOUR WAY HOME";
+  const { boss } = game.level;
+  if (boss && !bossDefeated(boss)) {
+    return boss.mode === "sleep" ? "THE MEGA-VAC GUARDS THE GOLDEN KEY" : "STOMP THE MEGA-VAC WHILE IT'S DIZZY";
+  }
+  return "FIND THE GOLDEN KEY. FOLLOW YOUR PAWS.";
+}
+
+function bossPhase() {
+  const { boss } = game.level;
+  if (!boss) return "";
+  return bossDefeated(boss) ? "defeated" : boss.mode === "sleep" ? "sleep" : "awake";
+}
+
 function setResultStats(items) {
   $("result-stats").replaceChildren();
   for (const [label, value] of items) {
@@ -144,16 +160,19 @@ function syncOverlay() {
   $("pause-button").setAttribute("aria-label", game.status === "paused" ? "Resume game" : "Pause game");
   $("pause-button").querySelector("path").setAttribute("d", game.status === "paused" ? "M6 3v14l11-7Z" : "M5 4h3v12H5zm7 0h3v12h-3z");
   if (game.status === "playing") {
-    $("objective").textContent = game.keyFound ? "KEY FOUND · FIND YOUR WAY HOME" : "FIND THE GOLDEN KEY. FOLLOW YOUR PAWS.";
+    $("objective").textContent = objective();
     return;
   }
   clearInput();
+  const finaleNext = game.status === "level-complete" && Boolean(LEVELS[game.levelIndex + 1]?.boss);
   const screens = {
     ready: ["HELLO, ADVENTURER", "Ready, player woof?", "The world's a little bigger from down here. Grab some treats. Find the key. Head home.", "Let's play"],
     paused: ["TAKE A LITTLE BREATHER", "Paws for a moment.", "Your adventure will be right here. Good dogs need snack breaks, too.", "Keep exploring"],
-    "level-complete": ["ONE TRAIL CLOSER TO HOME", "Look at you go!", `${game.level.name}, conquered. A fresh trail and a little extra heart are waiting.`, "Next trail"],
+    "level-complete": finaleNext
+      ? ["THE FINAL TRAIL AWAITS", "Look at you go!", `${game.level.name}, conquered. One last trail: the Mega-Vac guards the golden key in ${LEVELS[game.levelIndex + 1].name}.`, "Face the Mega-Vac"]
+      : ["ONE TRAIL CLOSER TO HOME", "Look at you go!", `${game.level.name}, conquered. A fresh trail and a little extra heart are waiting.`, "Next trail"],
     "game-over": ["EVERY ADVENTURE TAKES PRACTICE", "A little tumble.", "Even the best dogs miss a jump. Shake it off, wag that tail, and give it another go.", "Try again"],
-    won: ["CERTIFIED VERY GOOD DOG", "Home, sweet woof.", "Six trails. A pocket full of treats. And a well-earned nap. Welcome home, Biscuit.", "Play again"],
+    won: ["CHAMPION OF MOONLIT KEEP", "Victory, very good dog!", "The Mega-Vac is out of power and the golden key is home. Seven trails, a pocket full of treats, and the comfiest nap in the kingdom. Well done, Biscuit.", "Play again"],
   };
   const [kicker, title, description, action] = screens[game.status];
   $("overlay-kicker").textContent = `✦ ${kicker}`;
@@ -164,10 +183,13 @@ function syncOverlay() {
   arrow.textContent = "→";
   $("primary-button").replaceChildren(document.createTextNode(action), arrow);
   $("secondary-button").hidden = game.status !== "paused";
+  $("victory-badge").hidden = game.status !== "won";
   $("overlay-hint").textContent = overlayHint();
-  setResultStats(["level-complete", "game-over", "won"].includes(game.status)
+  const stats = ["level-complete", "game-over", "won"].includes(game.status)
     ? [["TREATS", game.status === "level-complete" ? `${game.levelTreats}/${game.level.treats.length}` : String(game.totalTreats)], ["SCORE", String(game.score)], ["TIME", timeLabel(game.status === "level-complete" ? game.levelTime : game.elapsed)]]
-    : []);
+    : [];
+  if (game.status === "won") stats.push(["TUMBLES", String(game.deaths)]);
+  setResultStats(stats);
   if (game.status !== "ready") {
     announce(`${title} ${description}`);
     $("primary-button").focus({ preventScroll: true });
@@ -175,7 +197,7 @@ function syncOverlay() {
 }
 
 function updateUi() {
-  const signature = [game.status, game.levelIndex, game.lives, game.levelTreats, game.keyFound, game.score].join(":");
+  const signature = [game.status, game.levelIndex, game.lives, game.levelTreats, game.keyFound, game.score, bossPhase()].join(":");
   if (signature === previousHud) return;
   previousHud = signature;
   $("level-number").textContent = String(game.levelIndex + 1).padStart(2, "0");
@@ -186,7 +208,7 @@ function updateUi() {
   $("treat-count").append(total);
   $("lives").innerHTML = Array.from({ length: Math.max(3, game.lives) }, (_, index) => heartMarkup(index >= game.lives)).join("");
   $("lives").setAttribute("aria-label", `${game.lives} ${game.lives === 1 ? "life" : "lives"} remaining`);
-  if (game.keyFound) $("objective").textContent = "KEY FOUND · FIND YOUR WAY HOME";
+  if (game.status === "playing") $("objective").textContent = objective();
   if (game.score > bestScore) {
     bestScore = game.score;
     savedPreference("best", String(bestScore));
@@ -217,7 +239,12 @@ function processEvents() {
     if (event.type === "key") toast("Golden key found! The doghouse is open.");
     if (event.type === "powerup") toast(POWERUP_MESSAGES[event.powerup](event));
     if (event.type === "checkpoint") toast("Checkpoint! A safe spot for little paws.");
-    if (event.type === "need-key") toast("The door is locked. Find the golden key first!");
+    if (event.type === "need-key") toast(game.level.boss && !bossDefeated(game.level.boss) ? "The door is locked. Beat the Mega-Vac to win the golden key!" : "The door is locked. Find the golden key first!");
+    if (event.type === "boss-wake") toast("The Mega-Vac whirs awake! Dodge its charge from a ledge, then stomp its lid while it's dizzy.");
+    if (event.type === "boss-crash") toast("CRASH! It's dizzy. Stomp the lid!");
+    if (event.type === "boss-bonk") toast("Clang! Its lid only dents while it's dizzy.");
+    if (event.type === "boss-hit") toast(`BONK! ${event.health} more ${event.health === 1 ? "stomp" : "stomps"}!`);
+    if (event.type === "boss-defeated") toast("The Mega-Vac powers down! It dropped the golden key.");
     if (event.type === "hurt" && game.lives > 0) toast(`Whoops! ${game.lives} ${game.lives === 1 ? "heart" : "hearts"} left. You've got this.`);
     if (event.type === "start") {
       $("toast").hidden = true;

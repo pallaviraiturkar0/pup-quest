@@ -1,3 +1,4 @@
+import { BOSS, bossDangerous, bossDefeated, resetBoss, stompBoss, updateBoss } from "./boss.js";
 import { updateEnemy } from "./enemies.js";
 import { LEVELS, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
 import { applyPowerup, isScared, PICKUP_RADIUS, speedMultiplier, tickPlayerPowerups, tickScared } from "./powerups.js";
@@ -90,8 +91,32 @@ function loseLife(game, reason) {
     : level.start;
   game.player = playerAt(spawn.x, spawn.y);
   game.player.invincible = 1.5;
+  if (level.boss) resetBoss(level.boss);
   game.cameraX = clamp(spawn.x - VIEW_WIDTH * 0.36, 0, level.width - VIEW_WIDTH);
   return true;
+}
+
+// On a boss trail the golden key only appears once the boss is beaten.
+export function keyAvailable(level) {
+  return !level.boss || bossDefeated(level.boss);
+}
+
+function stepBoss(game, previousBottom, dt) {
+  const { player: p, level: { boss } } = game;
+  const cue = updateBoss(boss, dt, p);
+  if (cue) game.events.push({ type: cue, x: boss.x + boss.w / 2, y: boss.y });
+  if (bossDefeated(boss) || !intersects(p, boss)) return false;
+  const onTop = p.vy > 0 && previousBottom <= boss.y + BOSS.stompTolerance;
+  if (onTop) {
+    const result = stompBoss(boss);
+    p.vy = -(result ? BOSS.stompBounce : BOSS.bonkBounce);
+    p.y = boss.y - p.h;
+    if (result === "boss-defeated") game.score += BOSS.score;
+    else if (result) game.score += 50;
+    game.events.push({ type: result ?? "boss-bonk", x: boss.x + boss.w / 2, y: boss.y, health: BOSS.hits - boss.hits });
+    return false;
+  }
+  return bossDangerous(boss) && loseLife(game, "boss");
 }
 
 function nearPickup(player, item, radius) {
@@ -166,6 +191,8 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
     } else if (!isScared(enemy) && loseLife(game, "enemy")) return;
   }
 
+  if (level.boss && stepBoss(game, previousBottom, dt)) return;
+
   for (const treat of level.treats) {
     if (!treat.collected && nearPickup(p, treat, 6)) {
       treat.collected = true;
@@ -178,7 +205,7 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   for (const item of level.powerups) {
     if (!item.collected && nearPickup(p, item, PICKUP_RADIUS)) applyPowerup(game, item);
   }
-  if (!game.keyFound && nearPickup(p, level.key, 9)) {
+  if (!game.keyFound && keyAvailable(level) && nearPickup(p, level.key, 9)) {
     game.keyFound = true;
     game.score += 100;
     game.events.push({ type: "key", x: level.key.x, y: level.key.y });

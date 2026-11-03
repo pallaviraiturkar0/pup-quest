@@ -86,6 +86,9 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .result-stats { display: flex; justify-content: center; gap: 22px; margin: -6px 0 20px; }
 .result-stats div { display: grid; gap: 5px; font: 8px var(--mono); letter-spacing: 1px; color: #7a8769; }
 .result-stats strong { font-size: 20px; letter-spacing: 0; color: #45563c; }
+.victory-badge { display: inline-flex; align-items: center; gap: 7px; margin: -4px 0 14px; padding: 5px 10px; background: #f6d27a; border: 1px solid #c9a94f; box-shadow: 3px 3px 0 #38523c27; font: 8px var(--mono); letter-spacing: 1.5px; color: #5b4a1f; }
+.victory-badge svg { width: 16px; height: 14px; color: #a57d1e; }
+.overlay.won .overlay-card { border-color: #c9a94f; }
 .game-toast { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); border: 1px solid #6d8558; background: #fffbe9; color: #3f5836; padding: 10px 15px; box-shadow: 3px 3px 0 #29482b30; font: 11px var(--mono); text-align: center; width: max-content; max-width: 90%; z-index: 2; pointer-events: none; }
 .game-toolbar { min-height: 49px; padding: 10px 19px; display: flex; align-items: center; justify-content: space-between; background: #edeedf; border-top: 1px solid #2b4438; gap: 12px; }
 .keyboard-legend, .keyboard-legend > span { display: flex; gap: 5px; align-items: center; font-size: 11px; color: #7c836f; }
@@ -129,11 +132,14 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .park-icon { color: #8fa77a; }
 .beach-icon { color: #b9a386; }
 .city-icon { color: #9f9cae; }
+.castle-icon { color: #8f8aa8; }
 .trail.active .forest-icon { color: #718a66; }
 .trail.active .night-icon { color: #9392b8; }
 .trail.active .park-icon { color: #5f9a5c; }
 .trail.active .beach-icon { color: #6fb3c2; }
 .trail.active .city-icon { color: #c9a94f; }
+.trail.active .castle-icon { color: #d0596b; }
+.trail.finale { grid-column: 1 / -1; }
 .trail-state { color: #a4b593; margin-left: auto; font-size: 10px; }
 .below-game { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0 26px; }
 .below-game p { font-size: 10px; color: #929785; margin: 0; }

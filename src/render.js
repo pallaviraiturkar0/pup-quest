@@ -1,3 +1,5 @@
+import { BOSS, bossHealth } from "./boss.js";
+import { keyAvailable } from "./engine.js";
 import { GROUND_Y, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
 import { activeParticles, calmParticles, clearParticles, createParticles, emitForEvent, particleAlpha, SHAPE_PIXELS, updateParticles } from "./particles.js";
 import { resolveColor, THEMES, themeForLevel } from "./themes.js";
@@ -225,6 +227,48 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
           for (let col = x + 3; col < x + w - 4; col += 6) {
             const on = layer.lit === 0 || noise(index * 131 + (row - top) * 7 + (col - x)) < layer.lit;
             if (on) rect(col, row, 2, 3, glass);
+          }
+        }
+      }
+    },
+    castle(layer, game, time, theme) {
+      const { spacing, base } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      const stone = resolveColor(theme, layer.color);
+      const roof = resolveColor(theme, layer.roof);
+      const glass = resolveColor(theme, layer.window);
+      const flag = resolveColor(theme, layer.flag);
+      const battlements = (x, top, w) => {
+        for (let mx = 0; mx + 4 <= w; mx += 7) rect(x + mx, top - 4, 4, 4, stone);
+      };
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 1; i += 1) {
+        const index = i + Math.floor(scroll / spacing);
+        const x = Math.round(i * spacing - (scroll % spacing) + noise(index + 150) * 30);
+        const wallW = Math.round(spacing * 0.6);
+        const wallTop = base - 30;
+        rect(x, wallTop, wallW, 30, stone);
+        battlements(x, wallTop, wallW);
+        rect(x + wallW / 2 - 7, base - 14, 14, 14, roof);
+        for (const [offset, slot] of [[-10, 0], [wallW / 2 - 13, 1], [wallW - 14, 2]]) {
+          const tall = slot === 1;
+          const w = tall ? 26 : 22;
+          const h = Math.round((tall ? 78 : 50) + noise(index * 5 + slot) * 22);
+          const tx = Math.round(x + offset);
+          const top = base - h;
+          rect(tx, top, w, h, stone);
+          if (noise(index * 7 + slot) < 0.55) {
+            polygon([[tx - 3, top], [tx + w / 2, top - 22], [tx + w + 3, top]], roof);
+            const wave = Math.floor(time * 3 + slot) % 2;
+            rect(tx + w / 2, top - 30, 1, 9, roof);
+            rect(tx + w / 2 + 1, top - 30 + wave, 6, 3, flag);
+          } else {
+            battlements(tx, top, w);
+          }
+          for (let row = top + 10; row < base - 18; row += 16) {
+            if (noise(index * 13 + slot * 3 + row) < 0.6) {
+              rect(tx + w / 2 - 2, row, 4, 6, glass);
+              rect(tx + w / 2 - 1, row - 1, 2, 1, glass);
+            }
           }
         }
       }
@@ -667,6 +711,82 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
 
   const CRITTERS = { squirrel: critter, vacuum, seagull, cat };
 
+  // Stone posts mark the Mega-Vac's arena walls, holding up the safe ledges.
+  function arenaWalls(boss, palette) {
+    for (const x of [boss.left - 6, boss.right]) {
+      rect(x, GROUND_Y - 32, 6, 32, palette.stone);
+      rect(x + 1, GROUND_Y - 30, 2, 28, palette.dirtLight);
+    }
+  }
+
+  // The Mega-Vac: a giant robot vacuum. Its visor tells you its mood: green
+  // while roaming, flashing red when it revs up to charge, yellow when dizzy.
+  function megaVac(boss, time, reducedMotion) {
+    const { mode } = boss;
+    if (mode === "hurt" && !reducedMotion && Math.floor(time * 16) % 2) return;
+    if (mode === "charge") {
+      ctx.globalAlpha = 0.5;
+      for (let i = 0; i < 4; i += 1) rect(boss.x + boss.w / 2 - boss.direction * (30 + i * 7), boss.y + 8 + i * 3, 6, 2, "#d8d6a4");
+      ctx.globalAlpha = 1;
+    }
+    if (mode === "defeated") {
+      for (let i = 0; i < 3; i += 1) {
+        ctx.globalAlpha = 0.35;
+        rect(boss.x + 14 + i * 9, boss.y - 8 - ((time * 12 + i * 5) % 14), 5, 5, "#9a9ca6");
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.save();
+    ctx.translate(Math.round(boss.x), Math.round(boss.y));
+    if (boss.direction < 0) { ctx.translate(boss.w, 0); ctx.scale(-1, 1); }
+    const shake = mode === "windup" ? Math.floor(time * 40) % 2 : 0;
+    ctx.translate(shake, 0);
+    rect(2, 10, 44, 12, "#3d4250");
+    rect(5, 4, 38, 7, "#6c7488");
+    rect(10, 1, 28, 4, "#8d96aa");
+    rect(44, 9, 4, 11, "#e2cda1");
+    rect(8, 21, 9, 3, "#1d2028");
+    rect(31, 21, 9, 3, "#1d2028");
+    for (let i = 0; i < boss.hits; i += 1) rect(14 + i * 8, 2, 4, 1, "#4f566a");
+    const spin = Math.floor(time * (mode === "charge" ? 30 : 10)) % 2;
+    rect(46, 20 + spin, 3, 1, "#c9c08e");
+    rect(46, 22 - spin, 3, 1, "#c9c08e");
+    const blink = Math.floor(time * 12) % 2;
+    const visor = {
+      sleep: "#2f5c3a", roam: "#7fe08a", windup: blink ? "#ff5a4f" : "#ffb0a0", charge: "#ff5a4f",
+      dizzy: "#ffe45c", hurt: "#fff4ca", defeated: "#2b2f3a",
+    }[mode];
+    rect(33, 6, 9, 3, visor);
+    if (mode === "dizzy") {
+      // The lid pops open, showing the dust bag: the spot to stomp.
+      rect(12, -3, 24, 3, "#8d96aa");
+      rect(16, 0, 16, 2, "#e3c7f0");
+    }
+    ctx.restore();
+    if (mode === "sleep") {
+      const bob = reducedMotion ? 0 : Math.floor(time * 2) % 3;
+      for (const [dx, dy] of [[0, 0], [7, -7]]) {
+        const zx = boss.x + boss.w / 2 + dx;
+        const zy = boss.y - 10 + dy - bob;
+        rect(zx, zy, 4, 1, "#fff4ca");
+        rect(zx + 2, zy + 1, 1, 1, "#fff4ca");
+        rect(zx + 1, zy + 2, 1, 1, "#fff4ca");
+        rect(zx, zy + 3, 4, 1, "#fff4ca");
+      }
+    }
+    if (mode === "dizzy") {
+      for (let i = 0; i < 3; i += 1) {
+        const angle = (reducedMotion ? 0 : time * 5) + i * Math.PI * 2 / 3;
+        rect(boss.x + boss.w / 2 + Math.cos(angle) * 14 - 1, boss.y - 9 + Math.sin(angle) * 3, 3, 3, "#ffe45c");
+      }
+    }
+    if (mode !== "sleep" && mode !== "defeated") {
+      for (let i = 0; i < BOSS.hits; i += 1) {
+        rect(boss.x + boss.w / 2 - 13 + i * 9, boss.y - 18, 7, 4, i < bossHealth(boss) ? "#ef6f6c" : "#4f566a");
+      }
+    }
+  }
+
   function effect(event, reducedMotion = false) {
     return emitForEvent(particles, event, { reducedMotion });
   }
@@ -723,7 +843,11 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     for (const treat of game.level.treats) {
       if (!treat.collected && treat.x > game.cameraX - 12 && treat.x < game.cameraX + VIEW_WIDTH + 12) bone(treat.x, treat.y, decorativeTime);
     }
-    if (!game.keyFound) goldenKey(game.level.key.x, game.level.key.y, decorativeTime);
+    if (game.level.boss) {
+      arenaWalls(game.level.boss, palette);
+      megaVac(game.level.boss, decorativeTime, reducedMotion);
+    }
+    if (!game.keyFound && keyAvailable(game.level)) goldenKey(game.level.key.x, game.level.key.y, decorativeTime);
     for (const item of game.level.powerups ?? []) {
       if (!item.collected && item.x > game.cameraX - 12 && item.x < game.cameraX + VIEW_WIDTH + 12) POWERUP_ART[item.type]?.(item.x, item.y, decorativeTime);
     }

@@ -4,7 +4,7 @@
 
 **[Play Pup Quest](https://pallaviraiturkar0.github.io/pup-quest/)**
 
-Run, jump, collect treats, and find the golden key to open the doghouse. Explore six handcrafted trails: Sunny Meadow, Mossy Hollow, Starlit Summit, Puppy Park, Seashell Shore, and Neon Nightwalk. Inspired by the approachable platforming of DOS-era games like Dangerous Dave, with entirely original code, levels, artwork, and synthesized sound effects.
+Run, jump, collect treats, and find the golden key to open the doghouse. Explore seven handcrafted trails: Sunny Meadow, Mossy Hollow, Starlit Summit, Puppy Park, Seashell Shore, Neon Nightwalk, and the finale, Moonlit Keep, where a boss guards the last golden key. Inspired by the approachable platforming of DOS-era games like Dangerous Dave, with entirely original code, levels, artwork, and synthesized sound effects.
 
 ## Controls
 
@@ -26,6 +26,19 @@ On phones and tablets, three paw-print buttons appear under the game (or beside 
 - On small screens the canvas scales to the page width. On short landscape phones, the paws move to either side of the canvas and the canvas shrinks so the HUD, game, and controls fit on one screen.
 
 Hold jump for a higher leap; tap for a short hop. Jump on critters to bounce off them, and avoid spikes and water. Each new trail adds a critter with its own tell: Puppy Park's **robot vacuums** flash red and rev up before dashing at a pup ahead of them, Seashell Shore's **seagulls** glide overhead and swoop down to puppy height (watch their shadow), and Neon Nightwalk's **alley cats** prowl rooftops, crouch, then pounce. Orange checkpoint flags save your position for the current trail. You start with three hearts and recover one on each new trail. Treats are optional; the golden key is required.
+
+### Finale: Moonlit Keep and the Mega-Vac
+
+Trail 07 unlocks after Neon Nightwalk. Moonlit Keep is a long castle-moat run under a big moon, with distant towers, glowing windows, and waving pennants, and it brings back every critter from the earlier trails. A checkpoint flag and a bone treat wait just before the boss arena.
+
+The **Mega-Vac**, a giant robot vacuum, naps in the arena until Biscuit steps in. Its visor shows what it's about to do:
+
+1. **Green**: it rolls around the arena.
+2. **Flashing red, shaking**: it revs up, facing the pup.
+3. **Charge**: it dashes toward where the pup was, all the way to the arena wall. Wait on the ledge above either wall and it can't reach you.
+4. **Yellow, stars, lid open**: it crashed into the wall and is dizzy for a couple of seconds. Hop onto its lid to dent it. Stomping it at any other time just bounces you off.
+
+Three stomps power it down (each round it gets a little quicker). It drops the golden key, and reaching the doghouse brings up the victory screen. Its sides hurt while it's awake; if you lose a heart, it rolls back home for a nap but keeps its dents.
 
 ### Power-ups
 
@@ -63,12 +76,13 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. A full-campaign input replay also checks that all six trails can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
 - `src/engine.js`: deterministic game rules and fixed-step physics.
-- `src/levels.js`: six handcrafted trails and their collectible/platform layouts.
+- `src/levels.js`: seven handcrafted trails and their collectible/platform layouts. A trail can add `boss: { x, left, right }` (in columns) to place a boss arena.
+- `src/boss.js`: the Mega-Vac boss state machine, stomp rules, and arena reset.
 - `src/enemies.js`: data-driven critters (squirrels, robot vacuums, seagulls, alley cats) with their movement rules. Levels place them with objects such as `{ type: "cat", x, left, right, speed, row }`; plain `[x, left, right, speed]` tuples are ground squirrels.
 - `src/powerups.js`: bone treat, zoomies, and squeaky toy rules (pickup, effects, and timers). Levels place them as `[type, column, y]` tuples.
 - `src/themes.js`: data-driven backdrops (palette, parallax layers, and ground decor) picked by each level's `theme`.
@@ -83,7 +97,7 @@ No frameworks, downloaded assets, trackers, analytics, external fonts, backend, 
 
 ## Themed backgrounds
 
-Every backdrop is drawn procedurally from data in `src/themes.js`: a palette plus an ordered list of parallax layers (sun or moon, stars, clouds, birds, sea, hills, dunes, city skylines, trees, palms, hedges, and street lamps). A level picks its backdrop with its `theme` field; unknown names fall back to the meadow. The first three trails use the meadow, forest, and starlit night; Puppy Park, Seashell Shore, and Neon Nightwalk use the **park**, **beach**, and **city** (night city) themes. Preview any theme on any trail with a query string, for example `?theme=beach` or `?theme=city`.
+Every backdrop is drawn procedurally from data in `src/themes.js`: a palette plus an ordered list of parallax layers (sun or moon, stars, clouds, birds, sea, hills, dunes, city skylines, castle towers, trees, palms, hedges, and street lamps). A level picks its backdrop with its `theme` field; unknown names fall back to the meadow. The first three trails use the meadow, forest, and starlit night; Puppy Park, Seashell Shore, Neon Nightwalk, and Moonlit Keep use the **park**, **beach**, **city** (night city), and **castle** (moonlit castle) themes. Preview any theme on any trail with a query string, for example `?theme=beach` or `?theme=castle`.
 
 ## Free hosting
 
