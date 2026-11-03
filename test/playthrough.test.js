@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, nextLevel, PHYSICS, startGame, stepGame } from "../src/engine.js";
+import { BOSS } from "../src/boss.js";
 import { MAX_LIVES } from "../src/powerups.js";
 
 // These waypoints use only ordinary movement and jumps, never teleportation.
@@ -62,7 +63,47 @@ const ROUTES = [
     [2082, 112, true], [2146, 80, true], [2202, 176, true], [2238, 176], [2306, 144, true],
     [2414, 176, true], [2450, 176], [2546, 160, true], [2580, 208, true], [2600, 208],
   ],
+  [
+    [100, 176, true], [180, 144, true], [262, 176, true], [300, 176], [356, 144, true],
+    [436, 112, true], [484, 144], [512, 144], [612, 176, true], [676, 144, true], [724, 112, true],
+    [752, 112], [870, 176, true], [948, 144, true], [976, 144], [1060, 176, true], [1088, 176],
+    [1140, 144, true], [1168, 144], [1206, 176, true], [1268, 176, true], [1348, 144, true],
+    [1412, 112, true], [1440, 112], [1588, 176, true], [1652, 144, true], [1700, 112, true],
+    [1728, 112], [1812, 176, true], [1846, 144, true], [1920, 144, true], [1966, 208], [1970, 208],
+    [2040, 176, true], [2070, 176], [2116, 144, true], [2164, 176, true], [2240, 176], [2300, 208],
+  ],
 ];
+
+// Moonlit Keep ends in the Mega-Vac's arena: wait on the left wall ledge, let it
+// charge into the wall, drop onto its lid while it's dizzy, then hop back.
+const BOSS_FIGHT = {
+  approach: [[2372, 176, true], [2410, 176]],
+  retreat: [2400, 176],
+  home: [[2593, 208], [2593, 208, true], [2824, 208]],
+};
+
+function waitFor(game, ready, input = {}) {
+  for (let frame = 0; frame < 2400; frame += 1) {
+    if (ready()) return;
+    stepGame(game, input, 1 / 120);
+    game.events.length = 0;
+    assert.equal(game.deaths, 0, `${game.level.name}: lost a life during the boss fight`);
+  }
+  assert.fail(`${game.level.name}: the boss fight stalled with the boss in ${game.level.boss.mode}`);
+}
+
+function fightBoss(game) {
+  const { boss } = game.level;
+  for (const [x, floor, jump] of BOSS_FIGHT.approach) travel(game, x, floor, jump);
+  while (boss.hits < BOSS.hits) {
+    waitFor(game, () => boss.mode === "dizzy");
+    const hits = boss.hits;
+    waitFor(game, () => boss.hits > hits, { right: true });
+    if (boss.hits < BOSS.hits) travel(game, ...BOSS_FIGHT.retreat);
+  }
+  assert.equal(boss.mode, "defeated");
+  for (const [x, floor, jump] of BOSS_FIGHT.home) travel(game, x, floor, jump);
+}
 
 function travel(game, x, floor, jump = false) {
   let airborne = false;
@@ -86,12 +127,13 @@ function travel(game, x, floor, jump = false) {
   assert.fail(`${game.level.name}: cannot reach ${x}/${floor}; stopped at ${game.player.x.toFixed(1)}/${(game.player.y + game.player.h).toFixed(1)}`);
 }
 
-test("a real-input playthrough reaches every golden key and wins all six trails without losing a heart", () => {
+test("a real-input playthrough beats the Mega-Vac, reaches every golden key, and wins all seven trails without losing a heart", () => {
   const game = createGame();
   startGame(game);
   stepGame(game);
   for (const [index, route] of ROUTES.entries()) {
     for (const [x, floor, jump] of route) travel(game, x, floor, jump);
+    if (game.level.boss) fightBoss(game);
     assert.equal(game.keyFound, true, `${game.level.name}: golden key was not reachable`);
     assert.equal(game.status, index === ROUTES.length - 1 ? "won" : "level-complete");
     if (game.status === "level-complete") {

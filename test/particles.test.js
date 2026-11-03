@@ -46,6 +46,7 @@ test("every game event with an effect maps to known bursts", () => {
   assert.ok(emitForEvent(system, { type: "level-complete", x: 10, y: 10 }) >= BURSTS.confetti.count, "level complete throws confetti");
   const shapes = new Set(activeParticles(system).map((particle) => particle.shape));
   assert.ok(shapes.has("confetti") && shapes.has("paw"), "confetti and paw prints both appear");
+  assert.ok(emitForEvent(system, { type: "boss-defeated", x: 10, y: 10 }) >= BURSTS.confetti.count, "beating the boss throws confetti");
   assert.equal(emitForEvent(system, { type: "need-key" }), 0);
   assert.equal(emitForEvent(system, { type: "treat", x: Number.NaN, y: 0 }), 0, "bad positions are ignored");
   assert.equal(emit(system, "fireworks", 0, 0), 0);

@@ -33,6 +33,12 @@ export const SOUND_RECIPES = Object.freeze({
   "level-complete": [...notes("square", [523, 659, 784, 1046, 1318], 0.09, 0.035), ...bark(0.5, 1.15, 0.06)],
   "game-over": notes("triangle", [330, 294, 247, 196], 0.14, 0.06),
   won: [...notes("square", [523, 659, 784, 1046, 784, 1046, 1318], 0.1, 0.035), ...bark(0.75, 1.2, 0.06), ...bark(0.9, 1.25, 0.06)],
+  // The Mega-Vac whirs up, clangs into walls, and powers down with a falling whine.
+  "boss-wake": [voice("sawtooth", 70, 220, 0, 0.6, 0.035), voice("noise", 1, 1, 0.1, 0.4, 0.015)],
+  "boss-crash": [voice("square", 120, 45, 0, 0.18, 0.06), voice("noise", 1, 1, 0, 0.12, 0.04)],
+  "boss-bonk": [voice("triangle", 880, 620, 0, 0.08, 0.04)],
+  "boss-hit": [voice("square", 220, 90, 0, 0.16, 0.05), ...bark(0.06, 1.1), voice("triangle", 1046, 1318, 0.18, 0.1, 0.04)],
+  "boss-defeated": [voice("sawtooth", 440, 50, 0, 0.9, 0.04), ...notes("square", [784, 988, 1175, 1568], 0.08, 0.03).map((part) => ({ ...part, at: part.at + 0.6 })), ...bark(1, 1.2, 0.06)],
 });
 
 export function soundRecipe(type) {

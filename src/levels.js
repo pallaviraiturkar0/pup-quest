@@ -1,3 +1,4 @@
+import { makeBoss } from "./boss.js";
 import { makeEnemy } from "./enemies.js";
 import { makePowerup } from "./powerups.js";
 
@@ -6,7 +7,7 @@ export const VIEW_WIDTH = 480;
 export const VIEW_HEIGHT = 256;
 export const GROUND_Y = 208;
 
-function trail({ name, theme, columns, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [] }) {
+function trail({ name, theme, columns, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null }) {
   const ground = [];
   let from = 0;
   for (const [column, width] of [...gaps, [columns, 0]]) {
@@ -39,6 +40,8 @@ function trail({ name, theme, columns, gaps, platforms, treats, key, checkpoint,
       });
     }),
     exit: { x: (columns - 6) * TILE, y: GROUND_Y - 32, w: 32, h: 32 },
+    // A boss guards an arena between two columns and drops the golden key when beaten.
+    boss: boss && makeBoss({ x: boss.x * TILE, left: boss.left * TILE, right: boss.right * TILE, floor: GROUND_Y }),
   };
 }
 
@@ -114,5 +117,35 @@ export const LEVELS = [
       { type: "cat", x: 66, left: 65, right: 69.875, speed: 22, row: 11 },
       { type: "cat", x: 129, left: 129, right: 130.875, speed: 14, row: 7, phase: 1.1 },
     ],
+  }),
+  trail({
+    name: "Moonlit Keep", theme: "castle", columns: 182,
+    gaps: [[16, 4], [33, 3], [48, 4], [63, 3], [78, 4], [94, 3], [109, 4], [124, 3], [138, 4]],
+    platforms: [
+      [6, 11, 3], [11, 9, 3], [16, 11, 4], [22, 9, 3], [27, 7, 3], [30, 9, 3], [38, 11, 3], [42, 9, 3], [45, 7, 3],
+      [54, 11, 6], [59, 9, 3], [66, 11, 3], [70, 9, 4], [75, 11, 3], [79, 11, 2], [84, 9, 3], [88, 7, 3],
+      [99, 11, 3], [103, 9, 3], [106, 7, 3], [113, 11, 2], [115, 9, 6], [127, 11, 3], [132, 9, 3], [135, 11, 3], [138, 11, 4],
+      // The Mega-Vac's arena: a safe ledge above each wall and two lookout perches.
+      [148, 11, 4], [156, 9, 3], [165, 9, 3], [172, 11, 4],
+    ],
+    treats: [
+      [4, 188], [7, 164], [12, 132], [13, 132], [18, 164], [23, 132], [28, 100], [31, 132], [34, 156], [39, 164],
+      [43, 132], [46, 100], [50, 156], [56, 164], [60, 132], [64, 156], [67, 164], [76, 164], [80, 164], [85, 132],
+      [95, 156], [100, 164], [104, 132], [107, 100], [111, 156], [116, 132], [118, 132], [125, 156], [129, 164],
+      [133, 132], [139, 164], [141, 164], [157, 132], [158, 132], [166, 132], [167, 132],
+    ],
+    powerups: [["squeaky", 71, 128], ["zoomies", 89, 100], ["bone", 146, 188]],
+    key: [162, 160], checkpoint: 144,
+    spikes: [[13, 1], [29, 2], [46, 1], [60, 2], [72, 1], [91, 2], [107, 1], [114, 1], [130, 1]],
+    enemies: [
+      [24, 23, 27, 26], [86, 85, 89, 28], [118, 117, 121, 30],
+      { type: "vacuum", x: 39, left: 38, right: 43, speed: 20 },
+      { type: "vacuum", x: 100, left: 99, right: 104, speed: 22 },
+      { type: "cat", x: 54, left: 54, right: 58.875, speed: 20, row: 11 },
+      { type: "cat", x: 115, left: 115, right: 119.875, speed: 16, row: 9, phase: 0.8 },
+      { type: "seagull", x: 68, left: 67, right: 74, speed: 24 },
+      { type: "seagull", x: 129, left: 128, right: 135, speed: 26, phase: 1.3 },
+    ],
+    boss: { x: 160, left: 151, right: 173 },
   }),
 ];

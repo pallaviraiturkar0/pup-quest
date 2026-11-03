@@ -71,10 +71,10 @@ function canTouch(surface, point) {
 const solids = (level) => [...level.ground, ...level.platforms];
 const box = (point, radius = 1) => ({ x: point.x - radius, y: point.y - radius, w: radius * 2, h: radius * 2 });
 
-test("the campaign has six uniquely named trails and the new ones use the park, beach, and night city themes", () => {
-  assert.equal(LEVELS.length, 6);
+test("the campaign has seven uniquely named trails and the newer ones use the park, beach, night city, and castle themes", () => {
+  assert.equal(LEVELS.length, 7);
   assert.equal(new Set(LEVELS.map((level) => level.name)).size, LEVELS.length);
-  assert.deepEqual(LEVELS.slice(3).map((level) => level.theme), ["park", "beach", "city"]);
+  assert.deepEqual(LEVELS.slice(3).map((level) => level.theme), ["park", "beach", "city", "castle"]);
   for (const level of LEVELS) assert.ok(Object.hasOwn(THEMES, level.theme), `${level.name}: unknown theme ${level.theme}`);
 });
 

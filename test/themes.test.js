@@ -9,11 +9,11 @@ import {
 } from "../src/themes.js";
 
 const HEX = /^#[0-9a-f]{6}$/i;
-const COLOR_FIELDS = ["color", "halo", "shadow", "crater", "window", "foam", "highlight", "post", "light"];
+const COLOR_FIELDS = ["color", "halo", "shadow", "crater", "window", "foam", "highlight", "post", "light", "roof", "flag"];
 
 test("every level uses a defined theme and existing levels keep their backdrops", () => {
   for (const level of LEVELS) assert.ok(Object.hasOwn(THEMES, level.theme), `${level.name} theme ${level.theme}`);
-  assert.deepEqual(LEVELS.map((level) => level.theme), ["meadow", "forest", "night", "park", "beach", "city"]);
+  assert.deepEqual(LEVELS.map((level) => level.theme), ["meadow", "forest", "night", "park", "beach", "city", "castle"]);
 });
 
 test("the new park, beach, and night city backdrops are available", () => {

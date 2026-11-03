@@ -11,7 +11,7 @@ export const PALETTE_KEYS = [
   "dirtDark", "stone", "water", "waterLight", "flower",
 ];
 
-export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "trees", "palms", "hedges", "lamps"];
+export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps"];
 export const SCATTER_KINDS = ["rock", "mushroom", "shell"];
 export const LANDMARK_KINDS = ["tree", "stump", "pillar", "palm", "bench", "hydrant"];
 
@@ -115,6 +115,26 @@ export const THEMES = {
       { kind: "lamps", parallax: 0.4, post: "#2b3048", light: "#ffe7a3", spacing: 120, glow: true },
     ],
     decor: { scatter: "rock", landmark: "hydrant" },
+  },
+  castle: {
+    label: "Moonlit castle",
+    palette: {
+      sky: "#1f2142", horizon: "#4e4a72", cloud: "#5d5b82", cloudShade: "#45466c",
+      far: "#3a3d62", hill: "#2c2f50", treeBack: "#33455a", tree: "#2d4150",
+      treeLight: "#43606a", trunk: "#565264", grass: "#7a9488", grassLight: "#a2b8a4",
+      grassDark: "#4f6670", dirt: "#6f6a7e", dirtLight: "#8a8598", dirtDark: "#575367",
+      stone: "#a3a2b4", water: "#3f4f86", waterLight: "#7488bb", flower: "#e3c7f0",
+    },
+    layers: [
+      { ...STARS, count: 52 },
+      { kind: "moon", parallax: 0.02, color: "#f4efd0", halo: "#5b5a86", shadow: "#6a6c90", crater: "#dcd8b8" },
+      { ...CLOUDS, count: 4 },
+      { ...FAR_HILLS, top: 128 },
+      // A distant keep: towers with battlements, pointed roofs, glowing windows, and pennants.
+      { kind: "castle", parallax: 0.12, color: "hill", roof: "#46406a", window: "#f6d27a", flag: "#d0596b", spacing: 230, base: 200 },
+      { kind: "trees", parallax: 0.3, style: "pine" },
+    ],
+    decor: { scatter: "rock", landmark: "pillar" },
   },
 };
 

@@ -17,6 +17,8 @@ function place(game, x, y) {
 }
 
 function finish(game) {
+  // A boss trail's key only appears once its boss is beaten.
+  if (game.level.boss) Object.assign(game.level.boss, { mode: "defeated", hits: 3 });
   place(game, game.level.key.x - 7, game.level.key.y - 9);
   tick(game);
   assert.equal(game.keyFound, true);

@@ -34,6 +34,10 @@ export const EVENT_BURSTS = Object.freeze({
   hurt: ["hurt"],
   "level-complete": ["confetti", "paws"],
   won: ["confetti", "paws", "big-sparkle"],
+  "boss-crash": ["dust"],
+  "boss-bonk": ["dust"],
+  "boss-hit": ["stomp", "big-sparkle"],
+  "boss-defeated": ["confetti", "big-sparkle"],
 });
 
 function blank() {
