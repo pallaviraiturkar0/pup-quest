@@ -64,7 +64,7 @@ h1 > span { color: var(--orange); }
 .viewport { position: relative; width: 100%; aspect-ratio: 480 / 256; background: #cce4ca; overflow: hidden; }
 canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
 .in-game-label { position: absolute; top: 17px; left: 20px; display: flex; align-items: center; gap: 7px; pointer-events: none; font: 8px var(--mono); letter-spacing: 1px; padding: 8px 10px; color: #4d6b49; background: #f7f8e0ba; border-radius: 2px; }
-.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: #d7ead02b; padding: 18px; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: safe center; background: #d7ead02b; padding: 18px; overflow-y: auto; overscroll-behavior: contain; }
 .overlay:not(.ready) { background: #213d376b; backdrop-filter: blur(3px); }
 .overlay-card { width: 342px; max-width: 100%; background: #fffdf0f5; border: 1px solid #c1c9a8; box-shadow: 5px 5px 0 #38523c27, 0 12px 35px #284c3620; padding: 27px 24px 22px; text-align: center; position: relative; }
 .overlay-card::before, .overlay-card::after { content: ""; width: 6px; height: 6px; position: absolute; top: 9px; background: #ced4bb; }
@@ -220,6 +220,8 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
   .result-stats { margin: -3px 0 10px; gap: 18px; }
   .result-stats div { font-size: 6px; gap: 2px; }
   .result-stats strong { font-size: 16px; }
+  .victory-badge { margin: 0 0 8px; padding: 3px 8px; font-size: 6px; }
+  .victory-badge svg { width: 12px; height: 11px; }
   .in-game-label { top: 9px; left: 9px; font-size: 6px; padding: 5px 6px; letter-spacing: .4px; }
   .in-game-label .status-dot { width: 4px; height: 4px; }
   .game-toast { bottom: 10px; padding: 7px 10px; font-size: 8px; }
