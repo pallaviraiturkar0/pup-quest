@@ -61,8 +61,20 @@
               <div id="result-stats" class="result-stats" hidden></div>
               <button id="primary-button" class="primary-button" type="button">Let's play <span aria-hidden="true">→</span></button>
               <button id="secondary-button" class="secondary-button" type="button" hidden>Restart adventure</button>
+              <button id="map-button" class="secondary-button map-button" type="button">Trail map: pick a trail</button>
               <span id="overlay-hint" class="overlay-hint">ARROWS TO MOVE <span>·</span> SPACE TO JUMP</span>
             </div>
+          </div>
+          <div id="trail-map" class="trail-map" role="dialog" aria-modal="true" aria-labelledby="trail-map-title" aria-describedby="trail-map-hint" hidden>
+            <div class="trail-map-header">
+              <div><h2 id="trail-map-title">Trail map</h2><p id="trail-map-status" class="trail-map-status" aria-hidden="true"></p></div>
+              <button id="trail-map-back" class="trail-map-back" type="button">Back <kbd>esc</kbd></button>
+            </div>
+            <div class="trail-map-board">
+              <svg id="trail-map-path" class="trail-map-path" viewBox="0 0 480 256" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <ol id="trail-map-stops" class="trail-map-stops" aria-label="Trails"></ol>
+            </div>
+            <p id="trail-map-hint" class="trail-map-hint">ARROWS TO CHOOSE · ENTER TO PLAY · ESC TO GO BACK</p>
           </div>
           <noscript><div class="noscript">Pup Quest needs JavaScript to play. Enable it in your browser and reload.</div></noscript>
         </div>

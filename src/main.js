@@ -5,6 +5,9 @@ import { createRenderer } from "./render.js";
 import { themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
 import {
+  chooseTrail, createTrailMap, isUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, UNLOCK_KEY, unlockAfterClear,
+} from "./trailmap.js";
+import {
   actionAt, clearTouches, createTouchState, pawPrintSvg, pointerDown, pointerMove, pointerUp,
   shouldShowTouchControls, touchInput,
 } from "./touch.js";
@@ -63,6 +66,8 @@ if (!Number.isSafeInteger(bestScore) || bestScore < 0) {
   toast("Your saved score couldn't be read. Starting a fresh score.");
   bestScore = 0;
 }
+let unlockedTrails = parseUnlocked(savedPreference(UNLOCK_KEY), LEVELS.length);
+let trailMap = null;
 const sound = new Sound({ storage: { get: (key) => savedPreference(key), set: (key, value) => savedPreference(key, value) } });
 
 const heartMarkup = (empty) => `<svg class="heart${empty ? " empty" : ""}" viewBox="0 0 16 15" aria-hidden="true"><path d="M2 1h4v2h4V1h4v2h2v5h-2v2h-2v2h-2v2H6v-2H4v-2H2V8H0V3h2Z" fill="currentColor"/></svg>`;
@@ -164,6 +169,7 @@ function syncOverlay() {
     return;
   }
   clearInput();
+  if (["level-complete", "won"].includes(game.status)) recordClear(game.levelIndex);
   const finaleNext = game.status === "level-complete" && Boolean(LEVELS[game.levelIndex + 1]?.boss);
   const screens = {
     ready: ["HELLO, ADVENTURER", "Ready, player woof?", "The world's a little bigger from down here. Grab some treats. Find the key. Head home.", "Let's play"],
@@ -183,6 +189,7 @@ function syncOverlay() {
   arrow.textContent = "→";
   $("primary-button").replaceChildren(document.createTextNode(action), arrow);
   $("secondary-button").hidden = game.status !== "paused";
+  $("map-button").hidden = !mapAvailable();
   $("victory-badge").hidden = game.status !== "won";
   $("overlay-hint").textContent = overlayHint();
   const stats = ["level-complete", "game-over", "won"].includes(game.status)
@@ -259,7 +266,8 @@ function primaryAction() {
   if (game.status === "ready") startGame(game);
   else if (game.status === "paused") resumeGame(game);
   else if (game.status === "level-complete") nextLevel(game);
-  else if (["won", "game-over"].includes(game.status)) restartGame(game);
+  else if (game.status === "won") restartGame(game, 0);
+  else if (game.status === "game-over") restartGame(game);
   renderer.clearEffects();
   processEvents();
   updateUi();
@@ -272,6 +280,145 @@ function togglePause() {
   else if (game.status === "paused") { resumeGame(game); focusGame(); }
   updateUi();
 }
+
+function recordClear(index) {
+  const next = unlockAfterClear(unlockedTrails, index, LEVELS.length);
+  if (next === unlockedTrails) return;
+  unlockedTrails = next;
+  savedPreference(UNLOCK_KEY, String(unlockedTrails));
+}
+
+function mapAvailable() {
+  return ["ready", "game-over", "won"].includes(game.status);
+}
+
+const pawMarkup = pawPrintSvg("jump");
+const padlockMarkup = '<svg class="padlock" viewBox="0 0 12 14" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><path d="M3 6V3h1V2h1V1h2v1h1v1h1v3h1v7H2V6Zm2 0h2V3H5Zm0 3v2h2V9Z" fill="currentColor" fill-rule="evenodd"/></svg>';
+const trailLayout = trailPath(LEVELS.length);
+
+function buildTrailMap() {
+  const svgNs = "http://www.w3.org/2000/svg";
+  const path = (className) => {
+    const element = document.createElementNS(svgNs, "path");
+    element.setAttribute("d", trailLayout.d);
+    element.setAttribute("class", className);
+    element.setAttribute("vector-effect", "non-scaling-stroke");
+    return element;
+  };
+  $("trail-map-path").replaceChildren(path("trail-map-road"), path("trail-map-dash"));
+  $("trail-map-stops").replaceChildren(...LEVELS.map((level, index) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    const { fill, ring, ink } = stopColors(level.theme);
+    const { x, y } = trailLayout.stops[index];
+    item.style.left = `${(x / 480) * 100}%`;
+    item.style.top = `${(y / 256) * 100}%`;
+    button.type = "button";
+    button.className = "trail-stop";
+    button.dataset.stop = String(index);
+    button.style.setProperty("--stop-fill", fill);
+    button.style.setProperty("--stop-ring", ring);
+    button.style.setProperty("--stop-ink", ink);
+    const label = document.createElement("span");
+    label.className = "trail-stop-label";
+    label.textContent = `${String(index + 1).padStart(2, "0")} ${level.name}`;
+    button.append(label);
+    button.addEventListener("click", () => pickTrail(index));
+    button.addEventListener("focus", () => {
+      if (!trailMap || trailMap.selected === index) return;
+      trailMap.selected = index;
+      syncTrailMap();
+    });
+    item.append(button);
+    return item;
+  }));
+}
+
+function syncTrailMap() {
+  for (const button of $("trail-map-stops").querySelectorAll(".trail-stop")) {
+    const index = Number(button.dataset.stop);
+    const open = isUnlocked(index, trailMap.unlocked);
+    const cleared = index < trailMap.unlocked - 1;
+    const selected = index === trailMap.selected;
+    button.classList.toggle("locked", !open);
+    button.classList.toggle("selected", selected);
+    button.tabIndex = selected ? 0 : -1;
+    button.setAttribute("aria-disabled", String(!open));
+    const name = `Trail ${String(index + 1).padStart(2, "0")}, ${LEVELS[index].name}`;
+    button.setAttribute("aria-label", `${name}${open ? cleared ? ", cleared" : "" : ", locked"}`);
+    const icon = button.querySelector("svg");
+    const wanted = open ? "paw" : "padlock";
+    if (!icon?.classList.contains(wanted)) {
+      icon?.remove();
+      button.insertAdjacentHTML("afterbegin", open ? pawMarkup : padlockMarkup);
+    }
+  }
+  const selected = trailMap.selected;
+  const state = !isUnlocked(selected, trailMap.unlocked) ? "LOCKED" : selected < trailMap.unlocked - 1 ? "CLEARED" : "OPEN";
+  $("trail-map-status").textContent = `TRAIL ${String(selected + 1).padStart(2, "0")} · ${LEVELS[selected].name.toUpperCase()} · ${state}`;
+}
+
+function focusSelectedStop() {
+  $("trail-map-stops").querySelector(`[data-stop="${trailMap.selected}"]`)?.focus({ preventScroll: true });
+}
+
+function openTrailMap() {
+  if (!mapAvailable()) return;
+  clearInput();
+  trailMap = createTrailMap(unlockedTrails, LEVELS.length, game.status === "ready" ? unlockedTrails - 1 : game.startIndex);
+  syncTrailMap();
+  $("trail-map").hidden = false;
+  $("overlay").inert = true;
+  focusSelectedStop();
+  announce(`Trail map. ${unlockedTrails} of ${LEVELS.length} trails open. Use the arrow keys to choose a trail.`);
+}
+
+function closeTrailMap({ restoreFocus = true } = {}) {
+  if (!trailMap) return;
+  trailMap = null;
+  $("trail-map").hidden = true;
+  $("overlay").inert = false;
+  if (restoreFocus) $("map-button").focus({ preventScroll: true });
+}
+
+function pickTrail(index) {
+  if (!trailMap) return;
+  trailMap.selected = index;
+  syncTrailMap();
+  const choice = chooseTrail(trailMap, index);
+  if (choice === null) {
+    const message = `Trail ${String(index + 1).padStart(2, "0")} is locked. Clear Trail ${String(index).padStart(2, "0")} to open it.`;
+    toast(message);
+    announce(message);
+    focusSelectedStop();
+    return;
+  }
+  unlockAudio();
+  closeTrailMap({ restoreFocus: false });
+  Object.assign(game, createGame(choice));
+  startGame(game);
+  renderer.clearEffects();
+  processEvents();
+  updateUi();
+  focusGame();
+}
+
+window.addEventListener("keydown", (event) => {
+  if (!trailMap || $("help-dialog").open || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeTrailMap();
+    return;
+  }
+  if (moveSelection(trailMap, event.key)) {
+    event.preventDefault();
+    syncTrailMap();
+    focusSelectedStop();
+  }
+});
+$("map-button").addEventListener("click", openTrailMap);
+$("trail-map-back").addEventListener("click", () => closeTrailMap());
+buildTrailMap();
 
 $("primary-button").addEventListener("click", primaryAction);
 $("pause-button").addEventListener("click", togglePause);
@@ -291,6 +438,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (!event.repeat) unlockAudio();
+  if (trailMap) return;
   if (["Escape", "KeyP"].includes(event.code) && ["playing", "paused"].includes(game.status)) {
     event.preventDefault();
     if (!event.repeat) togglePause();

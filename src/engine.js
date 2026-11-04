@@ -36,9 +36,10 @@ function loadLevel(game) {
   game.exitHintCooldown = 0;
 }
 
-export function createGame() {
+export function createGame(startIndex = 0) {
+  const first = Number.isInteger(startIndex) && startIndex >= 0 && startIndex < LEVELS.length ? startIndex : 0;
   const game = {
-    status: "ready", levelIndex: 0, lives: 3, score: 0, totalTreats: 0,
+    status: "ready", levelIndex: first, startIndex: first, lives: 3, score: 0, totalTreats: 0,
     elapsed: 0, events: [], deaths: 0,
   };
   loadLevel(game);
@@ -52,8 +53,9 @@ export function startGame(game) {
   }
 }
 
-export function restartGame(game) {
-  Object.assign(game, createGame());
+// Restarts from the trail this run began on (picked on the Trail Map), or from trail 01.
+export function restartGame(game, startIndex = game.startIndex ?? 0) {
+  Object.assign(game, createGame(startIndex));
   startGame(game);
 }
 
