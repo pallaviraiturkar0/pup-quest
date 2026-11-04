@@ -175,7 +175,7 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
 .trail-map[hidden] { display: none; }
 .trail-map-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .trail-map h2 { margin: 0; font: 700 16px var(--mono); letter-spacing: -.5px; }
-.trail-map-status { margin: 3px 0 0; font: 8px var(--mono); letter-spacing: 1px; color: #879271; }
+.trail-map-status { margin: 3px 0 0; font: 8px var(--mono); letter-spacing: 1px; color: #5d6b52; }
 .trail-map-back { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 10px; background: none; border: 1px solid #cdd2bd; border-radius: 3px; font-size: 11px; color: #5d6b52; }
 .trail-map-back:hover { border-color: #9cab88; }
 .trail-map-board { position: relative; flex: 1; min-height: 0; margin: 4px 8px; }
@@ -194,9 +194,8 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
 .trail-stop.selected:not(.locked) .paw { animation: paw-hop .9s ease-in-out infinite; }
 @keyframes paw-hop { 50% { transform: translateY(-3px); } }
 .trail-stop-label { position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%); white-space: nowrap; font: 600 8px var(--mono); letter-spacing: .5px; color: #4d5c45; background: #fffdf0e6; padding: 2px 4px; border-radius: 2px; pointer-events: none; }
-.trail-stop.locked .trail-stop-label { color: #8c9083; }
-.trail-stop:not(.selected) .trail-stop-label { opacity: .85; }
-.trail-map-hint { margin: 0; text-align: center; font: 7px var(--mono); letter-spacing: 1px; color: #939a81; }
+.trail-stop.locked .trail-stop-label { color: #5f6656; }
+.trail-map-hint { margin: 0; text-align: center; font: 7px var(--mono); letter-spacing: 1px; color: #5d6b52; }
 .touch-ui .trail-map-hint { display: none; }
 @media (max-width: 700px) {
   .trail-map { padding: 6px 10px 4px; }

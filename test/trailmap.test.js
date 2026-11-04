@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  chooseTrail, createTrailMap, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, unlockAfterClear,
+  chooseTrail, contrastRatio, createTrailMap, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, unlockAfterClear,
 } from "../src/trailmap.js";
 import { createGame, nextLevel, restartGame, startGame } from "../src/engine.js";
 import { LEVELS } from "../src/levels.js";
@@ -101,14 +101,15 @@ test("the winding path is deterministic, in bounds, and moves left to right", ()
   assert.notDeepEqual(trailPath(TOTAL, { seed: 99 }).stops, first.stops);
 });
 
-test("each stop is tinted by its trail's theme with readable ink", () => {
-  for (const level of LEVELS) {
-    const colors = stopColors(level.theme);
-    assert.equal(colors.fill, THEMES[level.theme].palette.sky);
-    assert.notEqual(colors.ink, colors.fill);
+test("each stop is tinted by its trail's theme with a paw that meets 3:1 contrast", () => {
+  assert.equal(contrastRatio("#000000", "#ffffff").toFixed(1), "21.0");
+  for (const name of Object.keys(THEMES)) {
+    const colors = stopColors(name);
+    assert.equal(colors.fill, THEMES[name].palette.sky);
+    assert.ok(contrastRatio(colors.ink, colors.fill) >= 3, `${name} paw contrast`);
   }
   assert.equal(stopColors("night").dark, true);
-  assert.equal(stopColors("castle").ink, THEMES.castle.palette.flower);
-  assert.equal(stopColors("meadow").dark, false);
-  assert.equal(stopColors("meadow").ink, THEMES.meadow.palette.tree);
+  assert.equal(stopColors("castle").ink, THEMES.castle.palette.flower, "night skies keep a themed light ink");
+  assert.equal(stopColors("forest").ink, THEMES.forest.palette.tree, "the theme's tree colour is used when it is readable");
+  assert.equal(stopColors("beach").ink, "#283d32", "falls back to page ink when no theme colour is readable");
 });

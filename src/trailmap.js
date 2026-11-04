@@ -79,13 +79,30 @@ export function trailPath(count, { width = 480, height = 256, margin = 40, seed 
 
 function luminance(hex) {
   const value = Number.parseInt(hex.slice(1), 16);
-  const channel = (shift) => ((value >> shift) & 255) / 255;
+  const channel = (shift) => {
+    const c = ((value >> shift) & 255) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
   return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0);
 }
 
-// Each stop is painted with its trail's sky, with an ink that stays readable on light and dark skies.
+// WCAG contrast ratio between two #rrggbb colours.
+export function contrastRatio(a, b) {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+export const MIN_ICON_CONTRAST = 3;
+const DARK_INK = "#283d32";
+const LIGHT_INK = "#fffdf0";
+
+// Each stop is painted with its trail's sky. The paw uses the first theme colour that stays
+// readable on that sky (3:1 for graphics), falling back to the page's dark or light ink.
 export function stopColors(themeName) {
   const { palette } = getTheme(themeName);
-  const dark = luminance(palette.sky) < 0.4;
-  return { fill: palette.sky, ring: palette.grassDark, ink: dark ? palette.flower : palette.tree, dark };
+  const dark = luminance(palette.sky) < 0.18;
+  const candidates = dark ? [palette.flower, palette.waterLight, palette.cloud] : [palette.tree, palette.grassDark, palette.trunk, palette.dirtDark];
+  const fallback = dark ? LIGHT_INK : DARK_INK;
+  const ink = candidates.find((color) => contrastRatio(color, palette.sky) >= MIN_ICON_CONTRAST) ?? fallback;
+  return { fill: palette.sky, ring: palette.grassDark, ink, dark };
 }
