@@ -54,7 +54,16 @@ Every sound is synthesized on the fly with the Web Audio API; there are no audio
 
 Small pixel particles add bounce: dust puffs when Biscuit lands hard or jumps, sparkles on treats, keys, checkpoints, and power-ups, paw prints when a critter is stomped, and confetti plus paw-print bursts at the doghouse. Particles live in a fixed pool (160 at most) so they never pile up. With **prefers-reduced-motion** turned on, moving particles are turned off and pickups show only a few still sparkles.
 
-Your personal best and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
+### Trail Map
+
+Pick **Trail map** on the title screen (or after a game over or victory) to see all seven trails as paw-print stops along a winding, procedurally drawn path, each tinted with its trail's theme colours. Trail 01 is always open; clearing a trail unlocks the next one, and unlocked trails stay open on that device. Locked trails show a padlock.
+
+- **Keyboard:** arrow keys (or Home/End) move between stops, Enter or Space starts the selected trail, and Esc goes back.
+- **Mouse and touch:** click or tap an unlocked stop to start it; the Back button closes the map.
+- Starting from the map plays from that trail to the finale with three fresh hearts. Trying again after a game over restarts from the trail you picked; playing again after a victory starts over from Trail 01.
+- With **prefers-reduced-motion**, the marching trail and hopping paw animations are turned off.
+
+Your personal best, unlocked trails, and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
 
 ## Run locally
 
@@ -76,7 +85,7 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
@@ -89,8 +98,9 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
 - `src/audio.js`: procedural sound recipes (pure data) plus a small Web Audio adapter that handles gesture unlock, mute, and saved preference.
 - `src/particles.js`: capped, DOM-free particle pool with dust, sparkle, paw-print, and confetti bursts, and reduced-motion fallbacks.
+- `src/trailmap.js`: DOM-free Trail Map logic: reading and advancing unlock progress, keyboard selection, locked-trail rules, the seeded winding path, and per-theme stop colours.
 - `src/touch.js`: touch-to-action logic (pointer tracking, paw hit-testing, touch-device detection) and the procedural paw-print button art, kept DOM-free so it runs under node tests.
-- `src/main.js`: keyboard controls, wiring for the touch paws, menus, accessibility announcements, and saved scores.
+- `src/main.js`: keyboard controls, wiring for the touch paws, menus and the Trail Map, accessibility announcements, and saved scores.
 - `styles.css`: responsive game page and touch layouts, with reduced-motion and fullscreen support.
 
 No frameworks, downloaded assets, trackers, analytics, external fonts, backend, or paid services.
