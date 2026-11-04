@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  chooseTrail, createTrailMap, isUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, unlockAfterClear,
+  chooseTrail, createTrailMap, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, unlockAfterClear,
 } from "../src/trailmap.js";
 import { createGame, nextLevel, restartGame, startGame } from "../src/engine.js";
 import { LEVELS } from "../src/levels.js";
@@ -28,6 +28,14 @@ test("clearing a trail unlocks the next one and never re-locks", () => {
   assert.ok(isUnlocked(0, 1));
   assert.ok(!isUnlocked(1, 1));
   assert.ok(!isUnlocked(-1, 3));
+});
+
+test("progress saved by another tab is never overwritten with a smaller count", () => {
+  assert.equal(mergeUnlocked(2, "5", TOTAL), 5);
+  assert.equal(unlockAfterClear(mergeUnlocked(2, "5", TOTAL), 0, TOTAL), 5, "clearing trail 01 in a stale tab keeps 05 open");
+  assert.equal(mergeUnlocked(4, "2", TOTAL), 4);
+  assert.equal(mergeUnlocked(3, null, TOTAL), 3);
+  assert.equal(mergeUnlocked(3, "junk", TOTAL), 3);
 });
 
 test("arrow keys walk every stop, clamp at the ends, and ignore other keys", () => {

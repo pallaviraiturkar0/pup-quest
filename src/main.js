@@ -5,7 +5,7 @@ import { createRenderer } from "./render.js";
 import { themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
 import {
-  chooseTrail, createTrailMap, isUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, UNLOCK_KEY, unlockAfterClear,
+  chooseTrail, createTrailMap, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, UNLOCK_KEY, unlockAfterClear,
 } from "./trailmap.js";
 import {
   actionAt, clearTouches, createTouchState, pawPrintSvg, pointerDown, pointerMove, pointerUp,
@@ -281,9 +281,15 @@ function togglePause() {
   updateUi();
 }
 
+function latestUnlocked() {
+  unlockedTrails = mergeUnlocked(unlockedTrails, savedPreference(UNLOCK_KEY), LEVELS.length);
+  return unlockedTrails;
+}
+
 function recordClear(index) {
-  const next = unlockAfterClear(unlockedTrails, index, LEVELS.length);
-  if (next === unlockedTrails) return;
+  const saved = latestUnlocked();
+  const next = unlockAfterClear(saved, index, LEVELS.length);
+  if (next === saved) return;
   unlockedTrails = next;
   savedPreference(UNLOCK_KEY, String(unlockedTrails));
 }
@@ -358,6 +364,24 @@ function syncTrailMap() {
   $("trail-map-status").textContent = `TRAIL ${String(selected + 1).padStart(2, "0")} · ${LEVELS[selected].name.toUpperCase()} · ${state}`;
 }
 
+// While the map is open everything else on the page is inert, except the live regions that announce map messages.
+let inertedElements = [];
+function setBackgroundInert(on) {
+  if (!on) {
+    for (const element of inertedElements) element.inert = false;
+    inertedElements = [];
+    return;
+  }
+  const keep = [$("trail-map"), $("toast"), $("announcer")];
+  for (let node = $("trail-map"); node && node !== document.body; node = node.parentElement) {
+    for (const sibling of node.parentElement.children) {
+      if (sibling === node || sibling.inert || keep.some((element) => sibling.contains(element))) continue;
+      sibling.inert = true;
+      inertedElements.push(sibling);
+    }
+  }
+}
+
 function focusSelectedStop() {
   $("trail-map-stops").querySelector(`[data-stop="${trailMap.selected}"]`)?.focus({ preventScroll: true });
 }
@@ -365,10 +389,11 @@ function focusSelectedStop() {
 function openTrailMap() {
   if (!mapAvailable()) return;
   clearInput();
+  latestUnlocked();
   trailMap = createTrailMap(unlockedTrails, LEVELS.length, game.status === "ready" ? unlockedTrails - 1 : game.startIndex);
   syncTrailMap();
   $("trail-map").hidden = false;
-  $("overlay").inert = true;
+  setBackgroundInert(true);
   focusSelectedStop();
   announce(`Trail map. ${unlockedTrails} of ${LEVELS.length} trails open. Use the arrow keys to choose a trail.`);
 }
@@ -377,7 +402,7 @@ function closeTrailMap({ restoreFocus = true } = {}) {
   if (!trailMap) return;
   trailMap = null;
   $("trail-map").hidden = true;
-  $("overlay").inert = false;
+  setBackgroundInert(false);
   if (restoreFocus) $("map-button").focus({ preventScroll: true });
 }
 
@@ -408,6 +433,14 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     event.preventDefault();
     closeTrailMap();
+    return;
+  }
+  if (event.key === "Tab") {
+    // Two tab stops: the selected trail and Back. Tab cycles between them.
+    event.preventDefault();
+    const onStop = event.target instanceof Element && event.target.closest(".trail-stop");
+    if (onStop) $("trail-map-back").focus({ preventScroll: true });
+    else focusSelectedStop();
     return;
   }
   if (moveSelection(trailMap, event.key)) {

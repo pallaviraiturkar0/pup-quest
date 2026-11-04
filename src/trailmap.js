@@ -11,6 +11,11 @@ export function parseUnlocked(raw, total) {
   return Math.min(Math.max(count, 1), total);
 }
 
+// Another tab may have saved more progress since this one loaded; the larger count wins.
+export function mergeUnlocked(current, raw, total) {
+  return Math.min(Math.max(current, parseUnlocked(raw, total)), total);
+}
+
 // Clearing trail `index` opens the one after it. Never re-locks anything.
 export function unlockAfterClear(unlocked, index, total) {
   return Math.min(Math.max(unlocked, index + 2), total);
