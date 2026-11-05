@@ -89,6 +89,18 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 .victory-badge { display: inline-flex; align-items: center; gap: 7px; margin: -4px 0 14px; padding: 5px 10px; background: #f6d27a; border: 1px solid #c9a94f; box-shadow: 3px 3px 0 #38523c27; font: 8px var(--mono); letter-spacing: 1.5px; color: #5b4a1f; }
 .victory-badge svg { width: 16px; height: 14px; color: #a57d1e; }
 .overlay.won .overlay-card { border-color: #c9a94f; }
+.medal-result { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 9px; margin: -8px 0 18px; padding: 7px 10px; border: 1px dashed #c1c9a8; text-align: left; }
+.medal-result[hidden] { display: none; }
+.medal-icon:empty { display: none; }
+.medal-icon .medal { display: block; width: 30px; height: 30px; }
+.medal-text { flex: 1 1 150px; min-width: 0; display: grid; gap: 3px; font: 8px var(--mono); letter-spacing: .5px; color: #5d6b52; }
+.medal-text strong { font-size: 11px; letter-spacing: 1px; color: #45563c; }
+.medal-result.gold { border-color: #c9a94f; background: #f6d27a26; }
+.new-best-badge { padding: 3px 7px; background: var(--orange); color: #fff; font: 700 8px var(--mono); letter-spacing: 1px; text-transform: uppercase; box-shadow: 2px 2px 0 #38523c30; }
+.new-best-badge::before, .new-best-badge::after { content: "✦"; padding: 0 4px; }
+.medal-result.new-best .medal-icon .medal, .new-best-badge { animation: medal-pop .6s cubic-bezier(.3, 1.6, .5, 1) both; }
+@keyframes medal-pop { from { transform: scale(.3) rotate(-12deg); opacity: 0; } }
+.run-timer { position: absolute; top: 17px; right: 20px; pointer-events: none; font: 9px var(--mono); letter-spacing: 1px; padding: 7px 9px; color: #4d6b49; background: #f7f8e0ba; border-radius: 2px; font-variant-numeric: tabular-nums; }
 .game-toast { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); border: 1px solid #6d8558; background: #fffbe9; color: #3f5836; padding: 10px 15px; box-shadow: 3px 3px 0 #29482b30; font: 11px var(--mono); text-align: center; width: max-content; max-width: 90%; z-index: 4; pointer-events: none; }
 .game-toolbar { min-height: 49px; padding: 10px 19px; display: flex; align-items: center; justify-content: space-between; background: #edeedf; border-top: 1px solid #2b4438; gap: 12px; }
 .keyboard-legend, .keyboard-legend > span { display: flex; gap: 5px; align-items: center; font-size: 11px; color: #7c836f; }
@@ -195,6 +207,12 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
 @keyframes paw-hop { 50% { transform: translateY(-3px); } }
 .trail-stop-label { position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%); white-space: nowrap; font: 600 8px var(--mono); letter-spacing: .5px; color: #4d5c45; background: #fffdf0e6; padding: 2px 4px; border-radius: 2px; pointer-events: none; }
 .trail-stop.locked .trail-stop-label { color: #5f6656; }
+.trail-stop-label > span { display: block; text-align: center; }
+.trail-stop-best { color: #6a5a2a; }
+.trail-stop-best:empty { display: none; }
+.trail-stop-medal { position: absolute; top: -9px; right: -11px; width: 20px; height: 20px; pointer-events: none; }
+.trail-stop-medal:empty { display: none; }
+.trail-stop-medal .medal { display: block; width: 100%; height: 100%; filter: drop-shadow(1px 1px 0 #38523c40); }
 .trail-map-hint { margin: 0; text-align: center; font: 7px var(--mono); letter-spacing: 1px; color: #5d6b52; }
 .touch-ui .trail-map-hint { display: none; }
 @media (max-width: 700px) {
@@ -208,6 +226,7 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
   .trail-stop.selected { transform: scale(1.1); box-shadow: 0 0 0 2px #fffdf0, 0 0 0 4px var(--orange); }
   .trail-stop .paw { width: 18px; height: 18px; }
   .trail-stop .padlock { width: 12px; height: 14px; }
+  .trail-stop-medal { top: -7px; right: -8px; width: 14px; height: 14px; }
   .trail-stop-label, .trail-map-hint { display: none; }
 }
 @media (min-width: 1500px) { .intro { margin-top: 49px; margin-bottom: 33px; } }
@@ -264,6 +283,7 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
   .victory-badge svg { width: 12px; height: 11px; }
   .in-game-label { top: 9px; left: 9px; font-size: 6px; padding: 5px 6px; letter-spacing: .4px; }
   .in-game-label .status-dot { width: 4px; height: 4px; }
+  .run-timer { top: 9px; right: 9px; font-size: 7px; padding: 4px 6px; }
   .game-toast { bottom: 10px; padding: 7px 10px; font-size: 8px; }
   .game-toolbar { padding: 8px 11px; min-height: 39px; }
   .keyboard-legend { gap: 12px; }
@@ -335,4 +355,5 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
   .paw-button.pressed .paw { transform: none; }
   .trail-map-dash, .trail-stop .paw { animation: none !important; }
+  .medal-result .medal, .new-best-badge { animation: none !important; }
 }

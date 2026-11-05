@@ -50,6 +50,7 @@
         <div class="viewport">
           <canvas id="game-canvas" width="480" height="256" tabindex="0" aria-label="Puppy platformer. Move with arrow keys or A and D. Jump with Space, W, or Up. Collect the golden key and reach the doghouse."></canvas>
           <div class="in-game-label"><span class="status-dot"></span><span id="objective">A LITTLE COURAGE GOES A LONG WAY</span></div>
+          <div id="run-timer" class="run-timer" aria-hidden="true">0:00.00</div>
           <div id="toast" class="game-toast" role="status" hidden></div>
           <div id="overlay" class="overlay">
             <div class="overlay-card">
@@ -59,6 +60,7 @@
               <h2 id="overlay-title">Ready, player woof?</h2>
               <p id="overlay-description">The world's a little bigger from down here.<br>Grab some treats. Find the key. Head home.</p>
               <div id="result-stats" class="result-stats" hidden></div>
+              <div id="medal-result" class="medal-result" hidden><span id="medal-icon" class="medal-icon"></span><span class="medal-text"><strong id="medal-name"></strong><span id="medal-detail"></span></span><span id="new-best" class="new-best-badge" hidden>New best!</span></div>
               <button id="primary-button" class="primary-button" type="button">Let's play <span aria-hidden="true">→</span></button>
               <button id="secondary-button" class="secondary-button" type="button" hidden>Restart adventure</button>
               <button id="map-button" class="secondary-button map-button" type="button">Trail map: pick a trail</button>
