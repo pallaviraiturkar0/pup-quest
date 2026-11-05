@@ -63,7 +63,29 @@ Pick **Trail map** on the title screen (or after a game over or victory) to see 
 - Starting from the map plays from that trail to the finale with three fresh hearts. Trying again after a game over restarts from the trail you picked; playing again after a victory starts over from Trail 01.
 - With **prefers-reduced-motion**, the marching trail and hopping paw animations are turned off.
 
-Your personal best, unlocked trails, and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
+### Time trials and paw medals
+
+Every trail run is timed. The clock in the top-right corner of the game starts when the trail starts, keeps running after a lost heart, and stops whenever the game is paused (including when the window loses focus or the help dialog is open). Restarting a trail resets it.
+
+Clear a trail to see your run time, your best time, and a paw medal on the level-clear screen. Beating your best time (or clearing a trail for the first time) adds a **New best!** badge, and the screen tells you the target for the next medal. Each trail has its own par times, stored as `par: [gold, silver, bronze]` seconds in `src/levels.js`:
+
+| Trail | Gold | Silver | Bronze |
+| --- | --- | --- | --- |
+| 01 Sunny Meadow | 0:21 | 0:28 | 0:42 |
+| 02 Mossy Hollow | 0:24 | 0:32 | 0:48 |
+| 03 Starlit Summit | 0:26 | 0:36 | 0:54 |
+| 04 Puppy Park | 0:36 | 0:48 | 1:12 |
+| 05 Seashell Shore | 0:35 | 0:48 | 1:12 |
+| 06 Neon Nightwalk | 0:34 | 0:46 | 1:10 |
+| 07 Moonlit Keep | 0:48 | 1:06 | 1:40 |
+
+Gold is about 10% slower than the full-campaign input replay used in the tests (which checks that it earns gold on every trail), so it rewards a clean, confident run without needing frame-perfect play. Slower clears still count; they just don't earn a medal yet.
+
+The Trail Map shows each cleared trail's best time and a medal badge on its stop, and the selected stop's details appear under the map title. Screen readers hear run times, best times, and medals in words, both on the level-clear screen and on each map stop. Medals are drawn as inline pixel-art SVG, and with **prefers-reduced-motion** the New best! pop animation is turned off.
+
+Best times are saved per trail on your device under `pup-quest:best-times`. Unreadable or tampered entries are ignored. Saves re-read the stored times under a cross-tab [Web Lock](https://developer.mozilla.org/docs/Web/API/Web_Locks_API) (when the browser supports it), so if another tab saved a faster time, the faster time is kept.
+
+Your personal best, unlocked trails, best trail times, and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
 
 ## Run locally
 
@@ -85,7 +107,7 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Time-trial tests cover the pause-aware trail timer, medal thresholds, best-time parsing and saving, keeping the faster time from another tab (including overlapping saves under the lock), time formatting, and medal art contrast. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
@@ -98,6 +120,7 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
 - `src/audio.js`: procedural sound recipes (pure data) plus a small Web Audio adapter that handles gesture unlock, mute, and saved preference.
 - `src/particles.js`: capped, DOM-free particle pool with dust, sparkle, paw-print, and confetti bursts, and reduced-motion fallbacks.
+- `src/medals.js`: DOM-free time-trial logic: medals from par times, best-time storage and merging, time formatting, and the medal art.
 - `src/trailmap.js`: DOM-free Trail Map logic: reading and advancing unlock progress, keyboard selection, locked-trail rules, the seeded winding path, and per-theme stop colours.
 - `src/touch.js`: touch-to-action logic (pointer tracking, paw hit-testing, touch-device detection) and the procedural paw-print button art, kept DOM-free so it runs under node tests.
 - `src/main.js`: keyboard controls, wiring for the touch paws, menus and the Trail Map, accessibility announcements, and saved scores.

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createGame, nextLevel, PHYSICS, startGame, stepGame } from "../src/engine.js";
 import { BOSS } from "../src/boss.js";
 import { MAX_LIVES } from "../src/powerups.js";
+import { medalFor, runMs } from "../src/medals.js";
 
 // These waypoints use only ordinary movement and jumps, never teleportation.
 // Each tuple is [destination x, landing surface y, jump].
@@ -127,7 +128,7 @@ function travel(game, x, floor, jump = false) {
   assert.fail(`${game.level.name}: cannot reach ${x}/${floor}; stopped at ${game.player.x.toFixed(1)}/${(game.player.y + game.player.h).toFixed(1)}`);
 }
 
-test("a real-input playthrough beats the Mega-Vac, reaches every golden key, and wins all seven trails without losing a heart", () => {
+test("a real-input playthrough beats the Mega-Vac, reaches every golden key, and wins all seven trails inside gold par without losing a heart", () => {
   const game = createGame();
   startGame(game);
   stepGame(game);
@@ -135,6 +136,8 @@ test("a real-input playthrough beats the Mega-Vac, reaches every golden key, and
     for (const [x, floor, jump] of route) travel(game, x, floor, jump);
     if (game.level.boss) fightBoss(game);
     assert.equal(game.keyFound, true, `${game.level.name}: golden key was not reachable`);
+    // Par times are tuned from this replay: its careful route must earn gold.
+    assert.equal(medalFor(runMs(game.levelTime), game.level.par), "gold", `${game.level.name}: ${game.levelTime.toFixed(2)}s misses gold`);
     assert.equal(game.status, index === ROUTES.length - 1 ? "won" : "level-complete");
     if (game.status === "level-complete") {
       nextLevel(game);

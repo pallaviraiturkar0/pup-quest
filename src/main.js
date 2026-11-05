@@ -5,6 +5,10 @@ import { createRenderer } from "./render.js";
 import { themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
 import {
+  BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_LABELS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes, recordBestTime,
+  runMs, spokenTime, withSaveLock,
+} from "./medals.js";
+import {
   chooseTrail, createTrailMap, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, UNLOCK_KEY, unlockAfterClear,
 } from "./trailmap.js";
 import {
@@ -68,6 +72,8 @@ if (!Number.isSafeInteger(bestScore) || bestScore < 0) {
 }
 let unlockedTrails = parseUnlocked(savedPreference(UNLOCK_KEY), LEVELS.length);
 let trailMap = null;
+let bestTimes = parseBestTimes(savedPreference(BEST_TIMES_KEY), LEVELS.length);
+let shownTimer = "";
 const sound = new Sound({ storage: { get: (key) => savedPreference(key), set: (key, value) => savedPreference(key, value) } });
 
 const heartMarkup = (empty) => `<svg class="heart${empty ? " empty" : ""}" viewBox="0 0 16 15" aria-hidden="true"><path d="M2 1h4v2h4V1h4v2h2v5h-2v2h-2v2h-2v2H6v-2H4v-2H2V8H0V3h2Z" fill="currentColor"/></svg>`;
@@ -169,7 +175,7 @@ function syncOverlay() {
     return;
   }
   clearInput();
-  if (["level-complete", "won"].includes(game.status)) recordClear(game.levelIndex);
+  const run = ["level-complete", "won"].includes(game.status) ? recordClear(game.levelIndex) : null;
   const finaleNext = game.status === "level-complete" && Boolean(LEVELS[game.levelIndex + 1]?.boss);
   const screens = {
     ready: ["HELLO, ADVENTURER", "Ready, player woof?", "The world's a little bigger from down here. Grab some treats. Find the key. Head home.", "Let's play"],
@@ -193,12 +199,13 @@ function syncOverlay() {
   $("victory-badge").hidden = game.status !== "won";
   $("overlay-hint").textContent = overlayHint();
   const stats = ["level-complete", "game-over", "won"].includes(game.status)
-    ? [["TREATS", game.status === "level-complete" ? `${game.levelTreats}/${game.level.treats.length}` : String(game.totalTreats)], ["SCORE", String(game.score)], ["TIME", timeLabel(game.status === "level-complete" ? game.levelTime : game.elapsed)]]
+    ? [["TREATS", game.status === "level-complete" ? `${game.levelTreats}/${game.level.treats.length}` : String(game.totalTreats)], ["SCORE", String(game.score)], ["TIME", game.status === "level-complete" ? formatTime(run.ms) : timeLabel(game.elapsed)]]
     : [];
   if (game.status === "won") stats.push(["TUMBLES", String(game.deaths)]);
   setResultStats(stats);
+  showMedalResult(run);
   if (game.status !== "ready") {
-    announce(`${title} ${description}`);
+    announce(`${title} ${description}${run ? ` ${medalSpeech(run)}` : ""}`);
     $("primary-button").focus({ preventScroll: true });
   }
 }
@@ -286,12 +293,63 @@ function latestUnlocked() {
   return unlockedTrails;
 }
 
+function latestBestTimes() {
+  bestTimes = mergeBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), LEVELS.length);
+  return bestTimes;
+}
+
+// Saves the unlock and, when it is a personal best, the trail time. Returns the run's medal result.
 function recordClear(index) {
   const saved = latestUnlocked();
   const next = unlockAfterClear(saved, index, LEVELS.length);
-  if (next === saved) return;
-  unlockedTrails = next;
-  savedPreference(UNLOCK_KEY, String(unlockedTrails));
+  if (next !== saved) {
+    unlockedTrails = next;
+    savedPreference(UNLOCK_KEY, String(unlockedTrails));
+  }
+  const ms = runMs(game.levelTime);
+  const { par } = LEVELS[index];
+  const result = recordBestTime(latestBestTimes(), index, ms);
+  bestTimes = result.times;
+  if (result.newBest) saveBestTimes();
+  return { index, ms, best: result.best, newBest: result.newBest, medal: medalFor(ms, par), next: nextMedal(ms, par) };
+}
+
+// Re-read and merge under a cross-tab lock so two tabs saving at once can't drop each other's records.
+function saveBestTimes() {
+  withSaveLock(navigator.locks, `pup-quest:${BEST_TIMES_KEY}`, () => {
+    const commit = commitBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), LEVELS.length);
+    bestTimes = commit.times;
+    savedPreference(BEST_TIMES_KEY, commit.raw);
+  }).catch((error) => console.warn("Pup Quest could not save a best time:", error));
+}
+
+window.addEventListener("storage", (event) => {
+  if (event.key !== `pup-quest:${BEST_TIMES_KEY}`) return;
+  latestBestTimes();
+  if (trailMap) syncTrailMap();
+});
+
+function medalSpeech({ ms, best, newBest, medal, next }) {
+  return [
+    `Trail time ${spokenTime(ms)}.`,
+    newBest ? "New best!" : "",
+    medal ? `${MEDAL_LABELS[medal]} medal.` : "No medal this time.",
+    !newBest && best !== null ? `Best time ${spokenTime(best)}.` : "",
+    next ? `${MEDAL_LABELS[next.medal]} is under ${spokenTime(next.ms)}.` : "",
+  ].filter(Boolean).join(" ");
+}
+
+function showMedalResult(run) {
+  $("medal-result").hidden = !run;
+  if (!run) return;
+  const { index, ms, best, newBest, medal, next } = run;
+  $("medal-result").className = `medal-result ${medal ?? "none"}${newBest ? " new-best" : ""}`;
+  $("medal-icon").innerHTML = medal ? medalSvg(medal) : "";
+  $("medal-name").textContent = medal ? MEDAL_LABELS[medal].toUpperCase() : "NO MEDAL YET";
+  const lead = game.status === "won" ? `${LEVELS[index].name} ${formatTime(ms)} · ` : "";
+  const goal = next ? `${MEDAL_LABELS[next.medal]} under ${formatTime(next.ms)}` : "Top dog time!";
+  $("medal-detail").textContent = `${lead}Best ${formatTime(best ?? ms)} · ${goal}`;
+  $("new-best").hidden = !newBest;
 }
 
 function mapAvailable() {
@@ -327,8 +385,14 @@ function buildTrailMap() {
     button.style.setProperty("--stop-ink", ink);
     const label = document.createElement("span");
     label.className = "trail-stop-label";
-    label.textContent = `${String(index + 1).padStart(2, "0")} ${level.name}`;
-    button.append(label);
+    const title = document.createElement("span");
+    title.textContent = `${String(index + 1).padStart(2, "0")} ${level.name}`;
+    const best = document.createElement("span");
+    best.className = "trail-stop-best";
+    label.append(title, best);
+    const medal = document.createElement("span");
+    medal.className = "trail-stop-medal";
+    button.append(label, medal);
     button.addEventListener("click", () => pickTrail(index));
     button.addEventListener("focus", () => {
       if (!trailMap || trailMap.selected === index) return;
@@ -344,15 +408,20 @@ function syncTrailMap() {
   for (const button of $("trail-map-stops").querySelectorAll(".trail-stop")) {
     const index = Number(button.dataset.stop);
     const open = isUnlocked(index, trailMap.unlocked);
-    const cleared = index < trailMap.unlocked - 1;
+    const best = bestTimes[index];
+    const medal = best === null ? null : medalFor(best, LEVELS[index].par);
+    const cleared = index < trailMap.unlocked - 1 || best !== null;
     const selected = index === trailMap.selected;
     button.classList.toggle("locked", !open);
     button.classList.toggle("selected", selected);
     button.tabIndex = selected ? 0 : -1;
     button.setAttribute("aria-disabled", String(!open));
     const name = `Trail ${String(index + 1).padStart(2, "0")}, ${LEVELS[index].name}`;
-    button.setAttribute("aria-label", `${name}${open ? cleared ? ", cleared" : "" : ", locked"}`);
-    const icon = button.querySelector("svg");
+    const record = best === null ? "" : `, best time ${spokenTime(best)}, ${medal ? `${MEDAL_LABELS[medal]} medal` : "no medal yet"}`;
+    button.setAttribute("aria-label", `${name}${open ? cleared ? ", cleared" : "" : ", locked"}${record}`);
+    button.querySelector(".trail-stop-best").textContent = best === null ? "" : `${formatTime(best)}${medal ? ` · ${medal.toUpperCase()}` : ""}`;
+    button.querySelector(".trail-stop-medal").innerHTML = medal ? medalSvg(medal) : "";
+    const icon = button.querySelector(":scope > svg");
     const wanted = open ? "paw" : "padlock";
     if (!icon?.classList.contains(wanted)) {
       icon?.remove();
@@ -360,8 +429,11 @@ function syncTrailMap() {
     }
   }
   const selected = trailMap.selected;
-  const state = !isUnlocked(selected, trailMap.unlocked) ? "LOCKED" : selected < trailMap.unlocked - 1 ? "CLEARED" : "OPEN";
-  $("trail-map-status").textContent = `TRAIL ${String(selected + 1).padStart(2, "0")} · ${LEVELS[selected].name.toUpperCase()} · ${state}`;
+  const best = bestTimes[selected];
+  const state = !isUnlocked(selected, trailMap.unlocked) ? "LOCKED" : selected < trailMap.unlocked - 1 || best !== null ? "CLEARED" : "OPEN";
+  const medal = best === null ? null : medalFor(best, LEVELS[selected].par);
+  const record = best === null ? "" : ` · BEST ${formatTime(best)} · ${medal ? MEDAL_LABELS[medal].toUpperCase() : "NO MEDAL YET"}`;
+  $("trail-map-status").textContent = `TRAIL ${String(selected + 1).padStart(2, "0")} · ${LEVELS[selected].name.toUpperCase()} · ${state}${record}`;
 }
 
 // While the map is open everything else on the page is inert, except the live regions that announce map messages.
@@ -390,6 +462,7 @@ function openTrailMap() {
   if (!mapAvailable()) return;
   clearInput();
   latestUnlocked();
+  latestBestTimes();
   trailMap = createTrailMap(unlockedTrails, LEVELS.length, game.status === "ready" ? unlockedTrails - 1 : game.startIndex);
   syncTrailMap();
   $("trail-map").hidden = false;
@@ -587,6 +660,13 @@ updateSoundButton();
 updateTouchVisibility();
 updateUi();
 
+function updateTimer() {
+  const text = formatTime(runMs(game.levelTime));
+  if (text === shownTimer) return;
+  shownTimer = text;
+  $("run-timer").textContent = text;
+}
+
 let previousTime = performance.now();
 let accumulator = 0;
 function frame(now) {
@@ -604,6 +684,7 @@ function frame(now) {
   } else accumulator = 0;
   processEvents();
   updateUi();
+  updateTimer();
   renderer.render(game, now / 1000, delta, reducedMotion.matches);
   requestAnimationFrame(frame);
 }
