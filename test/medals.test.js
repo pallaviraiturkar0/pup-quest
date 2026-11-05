@@ -10,6 +10,8 @@ import { contrastRatio } from "../src/trailmap.js";
 
 const TOTAL = LEVELS.length;
 const PAR = { gold: 20, silver: 30, bronze: 45 };
+// A best-times array sized to the campaign, with times set only for the given trail indexes.
+const trails = (entries = {}) => Array.from({ length: TOTAL }, (_, index) => entries[index] ?? null);
 
 test("the trail timer runs only while playing, so pauses never count", () => {
   const game = createGame();
@@ -48,21 +50,21 @@ test("every trail has ordered, positive par times", () => {
 });
 
 test("saved best times survive missing, corrupt, and tampered data", () => {
-  const empty = Array(TOTAL).fill(null);
+  const empty = trails();
   assert.equal(BEST_TIMES_KEY, "best-times");
   for (const raw of [null, undefined, "", "{", "null", "42", "[1,2]", '"text"']) assert.deepEqual(parseBestTimes(raw, TOTAL), empty, String(raw));
-  const parsed = parseBestTimes('{"1":19420,"2":"20000","3":-5,"4":1.5,"5":0,"6":99999999999,"8":1000,"__proto__":5}', TOTAL);
-  assert.deepEqual(parsed, [19420, null, null, null, null, null, null], "only whole positive milliseconds for real trails are kept");
-  const times = [19420, null, 25110, null, null, null, 61000];
+  const parsed = parseBestTimes(`{"1":19420,"2":"20000","3":-5,"4":1.5,"5":0,"6":99999999999,"${TOTAL + 1}":1000,"__proto__":5}`, TOTAL);
+  assert.deepEqual(parsed, trails({ 0: 19420 }), "only whole positive milliseconds for real trails are kept");
+  const times = trails({ 0: 19420, 2: 25110, 6: 61000 });
   assert.equal(serializeBestTimes(times), '{"1":19420,"3":25110,"7":61000}');
   assert.deepEqual(parseBestTimes(serializeBestTimes(times), TOTAL), times);
 });
 
 test("clearing a trail keeps the fastest time and flags only real improvements", () => {
-  const start = Array(TOTAL).fill(null);
+  const start = trails();
   const first = recordBestTime(start, 2, 30_000);
-  assert.deepEqual(first, { times: [null, null, 30_000, null, null, null, null], previous: null, best: 30_000, newBest: true });
-  assert.deepEqual(start, Array(TOTAL).fill(null), "the input is not mutated");
+  assert.deepEqual(first, { times: trails({ 2: 30_000 }), previous: null, best: 30_000, newBest: true });
+  assert.deepEqual(start, trails(), "the input is not mutated");
   const slower = recordBestTime(first.times, 2, 31_000);
   assert.equal(slower.newBest, false);
   assert.equal(slower.best, 30_000);
@@ -74,10 +76,10 @@ test("clearing a trail keeps the fastest time and flags only real improvements",
 });
 
 test("a stale tab never overwrites a faster time saved by another tab", () => {
-  const mine = [20_000, 40_000, null, null, null, null, null];
-  const saved = serializeBestTimes([25_000, 30_000, 50_000, null, null, null, null]);
+  const mine = trails({ 0: 20_000, 1: 40_000 });
+  const saved = serializeBestTimes(trails({ 0: 25_000, 1: 30_000, 2: 50_000 }));
   const merged = mergeBestTimes(mine, saved, TOTAL);
-  assert.deepEqual(merged, [20_000, 30_000, 50_000, null, null, null, null]);
+  assert.deepEqual(merged, trails({ 0: 20_000, 1: 30_000, 2: 50_000 }));
   const run = recordBestTime(merged, 1, 35_000);
   assert.equal(run.newBest, false, "the other tab's 0:30 still beats this tab's 0:35");
   assert.equal(run.best, 30_000);

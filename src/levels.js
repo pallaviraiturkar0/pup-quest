@@ -8,6 +8,9 @@ export const VIEW_HEIGHT = 256;
 export const GROUND_Y = 208;
 
 function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null }) {
+  if (!Array.isArray(par) || par.length !== 3 || !par.every((seconds, index) => Number.isFinite(seconds) && seconds > (par[index - 1] ?? 0))) {
+    throw new Error(`${name}: par must be [gold, silver, bronze] seconds in increasing order`);
+  }
   const ground = [];
   let from = 0;
   for (const [column, width] of [...gaps, [columns, 0]]) {

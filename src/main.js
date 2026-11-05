@@ -402,7 +402,7 @@ function syncTrailMap() {
     button.tabIndex = selected ? 0 : -1;
     button.setAttribute("aria-disabled", String(!open));
     const name = `Trail ${String(index + 1).padStart(2, "0")}, ${LEVELS[index].name}`;
-    const record = best === null ? "" : `, best time ${spokenTime(best)}, ${medal ? MEDAL_LABELS[medal] : "no medal yet"}`;
+    const record = best === null ? "" : `, best time ${spokenTime(best)}, ${medal ? `${MEDAL_LABELS[medal]} medal` : "no medal yet"}`;
     button.setAttribute("aria-label", `${name}${open ? cleared ? ", cleared" : "" : ", locked"}${record}`);
     button.querySelector(".trail-stop-best").textContent = best === null ? "" : `${formatTime(best)}${medal ? ` · ${medal.toUpperCase()}` : ""}`;
     button.querySelector(".trail-stop-medal").innerHTML = medal ? medalSvg(medal) : "";
