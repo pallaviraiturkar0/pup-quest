@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  BEST_TIMES_KEY, formatTime, MEDAL_COLORS, MEDALS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes,
-  recordBestTime, runMs, serializeBestTimes, spokenTime,
+  BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_COLORS, MEDALS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes,
+  recordBestTime, runMs, serializeBestTimes, spokenTime, withSaveLock,
 } from "../src/medals.js";
 import { createGame, pauseGame, resumeGame, startGame, stepGame } from "../src/engine.js";
 import { LEVELS } from "../src/levels.js";
@@ -85,6 +85,54 @@ test("a stale tab never overwrites a faster time saved by another tab", () => {
   assert.equal(run.best, 30_000);
   assert.deepEqual(mergeBestTimes(mine, "garbage", TOTAL), mine);
   assert.deepEqual(mergeBestTimes(mine, null, TOTAL), mine);
+});
+
+// A shared store plus a lock manager that grants one holder at a time, like navigator.locks across tabs.
+function sharedStorage() {
+  const store = { raw: null };
+  let queue = Promise.resolve();
+  const locks = {
+    request(name, task) {
+      const turn = queue.then(async () => {
+        await new Promise((resolve) => setImmediate(resolve));
+        return task();
+      });
+      queue = turn.catch(() => {});
+      return turn;
+    },
+  };
+  return { store, locks };
+}
+
+function tabSave({ store, locks }, tab) {
+  return withSaveLock(locks, "pup-quest:best-times", () => {
+    const commit = commitBestTimes(tab.times, store.raw, TOTAL);
+    tab.times = commit.times;
+    store.raw = commit.raw;
+  });
+}
+
+test("overlapping saves from two tabs keep every faster time", async () => {
+  const shared = sharedStorage();
+  shared.store.raw = serializeBestTimes(trails({ 1: 30_000 }));
+  // Both tabs loaded the 0:30 record, then each clears a run before either saves.
+  const a = { times: recordBestTime(trails({ 1: 30_000 }), 1, 20_000).times };
+  const b = { times: recordBestTime(trails({ 1: 30_000 }), 1, 25_000).times };
+  b.times = recordBestTime(b.times, 4, 40_000).times;
+  await Promise.all([tabSave(shared, a), tabSave(shared, b)]);
+  assert.deepEqual(parseBestTimes(shared.store.raw, TOTAL), trails({ 1: 20_000, 4: 40_000 }), "tab A's 0:20 survives tab B's later 0:25, and B's other trail is kept");
+  assert.deepEqual(b.times, trails({ 1: 20_000, 4: 40_000 }), "the later tab also learns the faster time");
+});
+
+test("saving still works without the Web Locks API or when a lock is refused", async () => {
+  const store = { raw: null };
+  const save = (locks, ms) => withSaveLock(locks, "best", () => {
+    store.raw = commitBestTimes(trails({ 0: ms }), store.raw, TOTAL).raw;
+  });
+  await save(undefined, 30_000);
+  await save({ request: () => Promise.reject(new DOMException("denied", "SecurityError")) }, 25_000);
+  assert.deepEqual(parseBestTimes(store.raw, TOTAL), trails({ 0: 25_000 }));
+  await assert.rejects(withSaveLock({ request: (name, task) => Promise.resolve().then(task) }, "best", () => { throw new Error("boom"); }), /boom/, "an error from the save itself is not retried");
 });
 
 test("times read naturally on screen and to screen readers", () => {

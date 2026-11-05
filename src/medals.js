@@ -66,6 +66,25 @@ export function mergeBestTimes(current, raw, total) {
   });
 }
 
+// The step that must run under the cross-tab lock: fold the stored times into this tab's, return what to write.
+export function commitBestTimes(current, raw, total) {
+  const times = mergeBestTimes(current, raw, total);
+  return { times, raw: serializeBestTimes(times) };
+}
+
+// Runs `task` while holding a Web Lock so tabs take turns saving. Browsers without the
+// Web Locks API (or that refuse the request) fall back to running it straight away.
+export function withSaveLock(locks, name, task) {
+  if (typeof locks?.request !== "function") return Promise.resolve().then(task);
+  let ran = false;
+  return Promise.resolve()
+    .then(() => locks.request(name, () => { ran = true; return task(); }))
+    .catch((error) => {
+      if (ran) throw error;
+      return task();
+    });
+}
+
 // Records a cleared run. A tie is not a new best; the first clear of a trail is.
 export function recordBestTime(times, index, ms) {
   const previous = validMs(times[index]) ? times[index] : null;
