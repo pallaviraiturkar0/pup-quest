@@ -548,7 +548,9 @@ function currentUnlockedSkins() {
 }
 
 function applySavedSkin() {
-  skinId = resolveSkin(savedPreference(SKIN_KEY), currentUnlockedSkins(), skinId);
+  const raw = savedPreference(SKIN_KEY);
+  // A missing key that was read successfully means Biscuit; only blocked storage keeps this session's pick.
+  skinId = resolveSkin(raw, currentUnlockedSkins(), storageAvailable ? DEFAULT_SKIN : skinId);
   renderer.setSkin(skinId);
 }
 
