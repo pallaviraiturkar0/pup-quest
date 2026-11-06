@@ -548,7 +548,7 @@ function currentUnlockedSkins() {
 }
 
 function applySavedSkin() {
-  skinId = resolveSkin(savedPreference(SKIN_KEY), currentUnlockedSkins());
+  skinId = resolveSkin(savedPreference(SKIN_KEY), currentUnlockedSkins(), skinId);
   renderer.setSkin(skinId);
 }
 

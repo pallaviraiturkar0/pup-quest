@@ -100,9 +100,11 @@ export function requirementText(skin, levels) {
   return `Earn ${MEDAL_WORD[rule.medal]} paws${better} on ${rule.count} trails`;
 }
 
-// The saved id if it names a skin the player has unlocked; otherwise the default.
-export function resolveSkin(raw, unlockedIds) {
-  const id = typeof raw === "string" ? raw.trim() : "";
+// The saved id if it names a skin the player has unlocked; otherwise the default. When nothing could be
+// read (`raw` is null or undefined, e.g. storage is blocked), the current in-memory choice is kept if still valid.
+export function resolveSkin(raw, unlockedIds, current = DEFAULT_SKIN) {
+  const value = raw ?? current;
+  const id = typeof value === "string" ? value.trim() : "";
   return unlockedIds.includes(id) && SKINS.some((skin) => skin.id === id) ? id : DEFAULT_SKIN;
 }
 

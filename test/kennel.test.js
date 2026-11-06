@@ -100,6 +100,15 @@ test("the saved skin falls back to the default when missing, corrupt, unknown, o
   assert.equal(getSkin("poodle").id, DEFAULT_SKIN);
 });
 
+test("an unreadable save keeps the current in-memory pup, but only while it is unlocked", () => {
+  const open = ["corgi", "dalmatian"];
+  assert.equal(resolveSkin(null, open, "dalmatian"), "dalmatian", "blocked storage keeps this session's pick");
+  assert.equal(resolveSkin(undefined, open, "dalmatian"), "dalmatian");
+  assert.equal(resolveSkin(null, open, "husky"), DEFAULT_SKIN, "a locked in-memory pick still falls back");
+  assert.equal(resolveSkin("corgi", open, "dalmatian"), "corgi", "a readable save wins over memory");
+  assert.equal(resolveSkin("junk", open, "dalmatian"), DEFAULT_SKIN);
+});
+
 test("picking a pup only accepts unlocked skins, and arrows walk every pup", () => {
   const open = ["corgi", "pug"];
   assert.equal(chooseSkin("pug", open), "pug");
