@@ -3,6 +3,7 @@ import { keyAvailable } from "./engine.js";
 import { GROUND_Y, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
 import { activeParticles, calmParticles, clearParticles, createParticles, emitForEvent, particleAlpha, SHAPE_PIXELS, updateParticles } from "./particles.js";
 import { resolveColor, THEMES, themeForLevel } from "./themes.js";
+import { DEFAULT_SKIN, drawPup, getSkin } from "./kennel.js";
 
 const noise = (n) => {
   const value = Math.sin(n * 127.1 + 311.7) * 43758.5453;
@@ -14,6 +15,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
   if (!ctx) throw new Error("This browser does not support the canvas needed to play Pup Quest.");
   ctx.imageSmoothingEnabled = false;
   const particles = createParticles();
+  let skin = getSkin(DEFAULT_SKIN);
 
   function rect(x, y, w, h, color) {
     ctx.fillStyle = color;
@@ -575,40 +577,8 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     ctx.save();
     ctx.translate(Math.round(p.x - 5), Math.round(p.y - 2) + (running ? step : 0));
     if (p.facing < 0) { ctx.translate(24, 0); ctx.scale(-1, 1); }
-    const outline = "#8e633e";
-    const fur = "#dda45f";
-    const light = "#edbd77";
-    const cream = "#f7e5bd";
     const tailY = 9 + Math.round(Math.sin(time * 12) * 1.3);
-    rect(0, tailY, 5, 3, outline);
-    rect(0, tailY - 2, 3, 3, cream);
-    rect(3, 9, 12, 9, outline);
-    rect(4, 9, 12, 7, fur);
-    rect(6, 9, 8, 2, light);
-    rect(11, 6, 12, 11, outline);
-    rect(12, 5, 10, 11, fur);
-    rect(12, 1, 4, 7, outline);
-    rect(13, 2, 2, 5, fur);
-    rect(14, 4, 1, 3, "#c58b72");
-    rect(19, 0, 4, 7, outline);
-    rect(20, 1, 2, 5, fur);
-    rect(20, 3, 1, 3, "#c58b72");
-    rect(15, 6, 3, 8, light);
-    rect(18, 6, 2, 8, cream);
-    rect(18, 12, 6, 4, cream);
-    rect(13, 14, 7, 4, cream);
-    rect(19, 8, 2, 3, "#334335");
-    rect(19, 8, 1, 1, "#fff4d8");
-    rect(22, 11, 3, 2, "#334335");
-    rect(21, 15, 2, 2, "#c88878");
-    rect(5 + step * 2, 16, 3, 4 - step, outline);
-    rect(5 + step * 2, 17, 3, 2, cream);
-    rect(15 - step * 2, 17, 3, 3 - step, outline);
-    rect(15 - step * 2, 18, 3, 2 - step, cream);
-    if (!p.grounded && !idle) {
-      rect(8, 16, 3, 2, fur);
-      rect(18, 16, 3, 2, cream);
-    }
+    drawPup(rect, skin, { tailY, step, airborne: !p.grounded && !idle });
     ctx.restore();
   }
 
@@ -873,5 +843,5 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     ctx.restore();
   }
 
-  return { render, effect, clearEffects: () => clearParticles(particles), particles };
+  return { render, effect, clearEffects: () => clearParticles(particles), setSkin: (id) => { skin = getSkin(id); }, particles };
 }

@@ -215,6 +215,30 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
 .trail-stop-medal .medal { display: block; width: 100%; height: 100%; filter: drop-shadow(1px 1px 0 #38523c40); }
 .trail-map-hint { margin: 0; text-align: center; font: 7px var(--mono); letter-spacing: 1px; color: #5d6b52; }
 .touch-ui .trail-map-hint { display: none; }
+.overlay-links { display: flex; flex-wrap: wrap; justify-content: center; column-gap: 16px; margin-top: 12px; }
+.overlay-links .secondary-button { margin: 0; }
+.trail-map-actions { display: flex; gap: 8px; }
+.kennel-skins { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; gap: 8px; margin: 8px 0 6px; }
+.kennel-skin { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; overflow: hidden; text-align: center; padding: 6px 8px; min-height: 44px; background: #fff; border: 2px solid #cdd2bd; border-radius: 4px; color: #2d3b2c; touch-action: manipulation; transition: transform .12s; }
+.kennel-skin:hover { border-color: #9cab88; }
+.kennel-preview { flex: 1 1 auto; min-height: 0; max-height: 92px; width: auto; aspect-ratio: 27 / 23; image-rendering: pixelated; margin-bottom: 4px; }
+.kennel-name { font: 700 11px var(--mono); }
+.kennel-breed { font: 8px var(--mono); letter-spacing: .5px; color: #5d6b52; text-transform: uppercase; }
+.kennel-need { font: 600 7px var(--mono); letter-spacing: .5px; color: #4d5c45; margin-top: 3px; }
+.kennel-skin.locked { background: #f0efe6; border-style: dashed; }
+.kennel-skin.locked .kennel-preview { filter: grayscale(1) brightness(.55) contrast(.8); }
+.kennel-skin.locked .kennel-need { color: #6a5a2a; }
+.kennel-skin.chosen { border-color: var(--orange); background: #fff7e3; }
+.kennel-skin.chosen .kennel-need { color: #8a4b1e; }
+.kennel-skin.focused { transform: translateY(-2px); box-shadow: 0 0 0 2px #fffdf0, 0 0 0 4px #2d3b2c; }
+@media (max-width: 700px) {
+  .kennel-skins { gap: 4px; margin: 4px 0 2px; }
+  .kennel-skin { padding: 2px 4px; }
+  .kennel-preview { margin-bottom: 1px; }
+  .kennel-name { font-size: 9px; }
+  .kennel-breed { font-size: 6px; }
+  .kennel-need { font-size: 6px; margin-top: 1px; }
+}
 @media (max-width: 700px) {
   .trail-map { padding: 6px 10px 4px; }
   .trail-map h2 { font-size: 13px; }
@@ -356,4 +380,5 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
   .paw-button.pressed .paw { transform: none; }
   .trail-map-dash, .trail-stop .paw { animation: none !important; }
   .medal-result .medal, .new-best-badge { animation: none !important; }
+  .kennel-skin.focused { transform: none; }
 }

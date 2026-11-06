@@ -85,7 +85,28 @@ The Trail Map shows each cleared trail's best time and a medal badge on its stop
 
 Best times are saved per trail on your device under `pup-quest:best-times`. Unreadable or tampered entries are ignored. Saves re-read the stored times under a cross-tab [Web Lock](https://developer.mozilla.org/docs/Web/API/Web_Locks_API) (when the browser supports it), so if another tab saved a faster time, the faster time is kept.
 
-Your personal best, unlocked trails, best trail times, and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
+### Dog Kennel
+
+Paw medals unlock new pups to play as. Pick **Dog kennel** on the title screen (or after a game over or victory), or the **Kennel** button on the Trail Map, to see every pup:
+
+| Pup | Breed | How to unlock |
+| --- | --- | --- |
+| Biscuit | Corgi | Always in the kennel |
+| Domino | Dalmatian | A bronze paw or better on any trail |
+| Pickles | Pug | Silver paws or better on 3 trails |
+| Bagel | Beagle | A gold paw on any trail |
+| Juniper | Husky | A gold paw on Trail 07 Moonlit Keep |
+| Sunny | Golden Retriever | Gold paws on all 7 trails |
+
+A better medal counts for the lower ones (a gold also counts as a silver and a bronze). Unlocks come straight from your saved best times, so every medal you already have counts. Locked pups appear greyed out with their requirement and your progress (for example "2 of 3"); pick an unlocked pup and it runs the trails in your next game. Each coat is drawn procedurally on canvas with its own palette, ears, tail, and markings, using the same sprite code as gameplay.
+
+- **Keyboard:** arrow keys (or Home/End) move between pups, Enter or Space picks one, Tab moves between the pups and Back, and Esc goes back (to the Trail Map if you came from there).
+- **Mouse and touch:** click or tap a pup to pick it.
+- Screen readers hear each pup's name, breed, and whether it is picked, unlocked, or locked with its requirement. With **prefers-reduced-motion**, the picked pup's tail stops wagging and cards don't lift.
+
+The chosen pup is saved under `pup-quest:skin`. A missing, unknown, or still-locked choice falls back to Biscuit.
+
+Your personal best, unlocked trails, best trail times, chosen pup, and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
 
 ## Run locally
 
@@ -107,7 +128,7 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Time-trial tests cover the pause-aware trail timer, medal thresholds, best-time parsing and saving, keeping the faster time from another tab (including overlapping saves under the lock), time formatting, and medal art contrast. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Time-trial tests cover the pause-aware trail timer, medal thresholds, best-time parsing and saving, keeping the faster time from another tab (including overlapping saves under the lock), time formatting, and medal art contrast. Kennel tests cover skin data validity (palettes, ears, tails, markings, and unlock rules), every coat drawing inside the sprite box, medal-based unlock rules and progress, requirement wording, picking only unlocked pups, and falling back to Biscuit for missing, corrupt, unknown, or locked saves. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
@@ -122,8 +143,9 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 - `src/particles.js`: capped, DOM-free particle pool with dust, sparkle, paw-print, and confetti bursts, and reduced-motion fallbacks.
 - `src/medals.js`: DOM-free time-trial logic: medals from par times, best-time storage and merging, time formatting, and the medal art.
 - `src/trailmap.js`: DOM-free Trail Map logic: reading and advancing unlock progress, keyboard selection, locked-trail rules, the seeded winding path, and per-theme stop colours.
+- `src/kennel.js`: DOM-free Dog Kennel logic: pup skin data, medal-based unlock rules, saved-skin fallback, and the shared procedural pup sprite used by gameplay and the Kennel previews.
 - `src/touch.js`: touch-to-action logic (pointer tracking, paw hit-testing, touch-device detection) and the procedural paw-print button art, kept DOM-free so it runs under node tests.
-- `src/main.js`: keyboard controls, wiring for the touch paws, menus and the Trail Map, accessibility announcements, and saved scores.
+- `src/main.js`: keyboard controls, wiring for the touch paws, menus, the Trail Map and Dog Kennel, accessibility announcements, and saved scores.
 - `styles.css`: responsive game page and touch layouts, with reduced-motion and fullscreen support.
 
 No frameworks, downloaded assets, trackers, analytics, external fonts, backend, or paid services.
