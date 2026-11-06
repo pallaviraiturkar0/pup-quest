@@ -12,6 +12,10 @@ import {
   chooseTrail, createTrailMap, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, UNLOCK_KEY, unlockAfterClear,
 } from "./trailmap.js";
 import {
+  chooseSkin, DEFAULT_SKIN, drawPup, getSkin, moveSkinFocus, requirementText, resolveSkin, SKIN_KEY, SKINS, skinProgress, SPRITE_HEIGHT,
+  SPRITE_WIDTH, unlockedSkinIds,
+} from "./kennel.js";
+import {
   actionAt, clearTouches, createTouchState, pawPrintSvg, pointerDown, pointerMove, pointerUp,
   shouldShowTouchControls, touchInput,
 } from "./touch.js";
@@ -74,6 +78,8 @@ let unlockedTrails = parseUnlocked(savedPreference(UNLOCK_KEY), LEVELS.length);
 let trailMap = null;
 let bestTimes = parseBestTimes(savedPreference(BEST_TIMES_KEY), LEVELS.length);
 let shownTimer = "";
+let kennel = null;
+let skinId = DEFAULT_SKIN;
 const sound = new Sound({ storage: { get: (key) => savedPreference(key), set: (key, value) => savedPreference(key, value) } });
 
 const heartMarkup = (empty) => `<svg class="heart${empty ? " empty" : ""}" viewBox="0 0 16 15" aria-hidden="true"><path d="M2 1h4v2h4V1h4v2h2v5h-2v2h-2v2h-2v2H6v-2H4v-2H2V8H0V3h2Z" fill="currentColor"/></svg>`;
@@ -196,6 +202,7 @@ function syncOverlay() {
   $("primary-button").replaceChildren(document.createTextNode(action), arrow);
   $("secondary-button").hidden = game.status !== "paused";
   $("map-button").hidden = !mapAvailable();
+  $("kennel-button").hidden = !mapAvailable();
   $("victory-badge").hidden = game.status !== "won";
   $("overlay-hint").textContent = overlayHint();
   const stats = ["level-complete", "game-over", "won"].includes(game.status)
@@ -324,9 +331,12 @@ function saveBestTimes() {
 }
 
 window.addEventListener("storage", (event) => {
-  if (event.key !== `pup-quest:${BEST_TIMES_KEY}`) return;
+  // A null key means another tab cleared all of storage.
+  if (event.key !== null && ![`pup-quest:${BEST_TIMES_KEY}`, `pup-quest:${SKIN_KEY}`].includes(event.key)) return;
   latestBestTimes();
+  applySavedSkin();
   if (trailMap) syncTrailMap();
+  if (kennel) syncKennel();
 });
 
 function medalSpeech({ ms, best, newBest, medal, next }) {
@@ -438,14 +448,14 @@ function syncTrailMap() {
 
 // While the map is open everything else on the page is inert, except the live regions that announce map messages.
 let inertedElements = [];
-function setBackgroundInert(on) {
+function setBackgroundInert(on, dialog = $("trail-map")) {
   if (!on) {
     for (const element of inertedElements) element.inert = false;
     inertedElements = [];
     return;
   }
-  const keep = [$("trail-map"), $("toast"), $("announcer")];
-  for (let node = $("trail-map"); node && node !== document.body; node = node.parentElement) {
+  const keep = [dialog, $("toast"), $("announcer")];
+  for (let node = dialog; node && node !== document.body; node = node.parentElement) {
     for (const sibling of node.parentElement.children) {
       if (sibling === node || sibling.inert || keep.some((element) => sibling.contains(element))) continue;
       sibling.inert = true;
@@ -509,11 +519,14 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (event.key === "Tab") {
-    // Two tab stops: the selected trail and Back. Tab cycles between them.
+    // Three tab stops: the selected trail, Kennel, and Back. Tab and Shift+Tab cycle through them.
     event.preventDefault();
+    const stops = ["stop", "trail-map-kennel", "trail-map-back"];
     const onStop = event.target instanceof Element && event.target.closest(".trail-stop");
-    if (onStop) $("trail-map-back").focus({ preventScroll: true });
-    else focusSelectedStop();
+    const current = onStop ? 0 : Math.max(stops.indexOf(event.target?.id), 0);
+    const next = stops[(current + (event.shiftKey ? stops.length - 1 : 1)) % stops.length];
+    if (next === "stop") focusSelectedStop();
+    else $(next).focus({ preventScroll: true });
     return;
   }
   if (moveSelection(trailMap, event.key)) {
@@ -524,7 +537,178 @@ window.addEventListener("keydown", (event) => {
 });
 $("map-button").addEventListener("click", openTrailMap);
 $("trail-map-back").addEventListener("click", () => closeTrailMap());
+$("trail-map-kennel").addEventListener("click", () => {
+  closeTrailMap({ restoreFocus: false });
+  openKennel("map");
+});
 buildTrailMap();
+
+// Dog Kennel: pick a pup skin earned with paw medals.
+function currentUnlockedSkins() {
+  return unlockedSkinIds(bestTimes, LEVELS);
+}
+
+function applySavedSkin() {
+  const raw = savedPreference(SKIN_KEY);
+  // A missing key that was read successfully means Biscuit; only blocked storage keeps this session's pick.
+  skinId = resolveSkin(raw, currentUnlockedSkins(), storageAvailable ? DEFAULT_SKIN : skinId);
+  renderer.setSkin(skinId);
+}
+
+function drawSkinPreview(preview, skin, tailY = 9) {
+  const context = preview.getContext("2d");
+  if (!context) return;
+  context.clearRect(0, 0, preview.width, preview.height);
+  drawPup((x, y, w, h, color) => {
+    context.fillStyle = color;
+    context.fillRect(x + 1, y + 1, w, h);
+  }, skin, { tailY });
+}
+
+function buildKennel() {
+  $("kennel-skins").replaceChildren(...SKINS.map((skin, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "kennel-skin";
+    button.dataset.skin = skin.id;
+    button.setAttribute("role", "radio");
+    const preview = document.createElement("canvas");
+    preview.className = "kennel-preview";
+    preview.width = SPRITE_WIDTH + 2;
+    preview.height = SPRITE_HEIGHT + 2;
+    preview.setAttribute("aria-hidden", "true");
+    drawSkinPreview(preview, skin);
+    const name = document.createElement("span");
+    name.className = "kennel-name";
+    name.textContent = skin.name;
+    const breed = document.createElement("span");
+    breed.className = "kennel-breed";
+    breed.textContent = skin.breed;
+    const need = document.createElement("span");
+    need.className = "kennel-need";
+    button.append(preview, name, breed, need);
+    button.addEventListener("click", () => pickSkin(index));
+    button.addEventListener("focus", () => {
+      if (!kennel || kennel.focus === index) return;
+      kennel.focus = index;
+      syncKennel();
+    });
+    return button;
+  }));
+}
+
+function syncKennel() {
+  const unlocked = currentUnlockedSkins();
+  const buttons = [...$("kennel-skins").querySelectorAll(".kennel-skin")];
+  buttons.forEach((button, index) => {
+    const skin = SKINS[index];
+    const open = unlocked.includes(skin.id);
+    const chosen = skin.id === skinId;
+    const progress = skinProgress(skin, bestTimes, LEVELS);
+    const requirement = requirementText(skin, LEVELS);
+    button.classList.toggle("locked", !open);
+    button.classList.toggle("chosen", chosen);
+    button.classList.toggle("focused", index === kennel.focus);
+    button.tabIndex = index === kennel.focus ? 0 : -1;
+    button.setAttribute("aria-checked", String(chosen));
+    button.setAttribute("aria-disabled", String(!open));
+    const count = progress.need > 1 ? ` (${progress.have} of ${progress.need})` : "";
+    button.querySelector(".kennel-need").textContent = open ? chosen ? "PICKED" : "UNLOCKED" : `🔒 ${requirement}${count}`;
+    button.setAttribute("aria-label", `${skin.name} the ${skin.breed}${open ? chosen ? ", picked" : ", unlocked" : `, locked. ${requirement}${count}`}`);
+  });
+  const total = SKINS.length;
+  $("kennel-status").textContent = `${unlocked.length} OF ${total} PUPS UNLOCKED · PLAYING AS ${getSkin(skinId).name.toUpperCase()}`;
+}
+
+function focusKennelSkin() {
+  $("kennel-skins").querySelectorAll(".kennel-skin")[kennel.focus]?.focus({ preventScroll: true });
+}
+
+let wagFrame = 0;
+function wagChosenPreview(now) {
+  if (!kennel) return;
+  const index = SKINS.findIndex((skin) => skin.id === skinId);
+  const preview = $("kennel-skins").querySelectorAll(".kennel-preview")[index];
+  if (preview) drawSkinPreview(preview, SKINS[index], reducedMotion.matches ? 9 : 9 + Math.round(Math.sin(now / 1000 * 12) * 1.3));
+  wagFrame = requestAnimationFrame(wagChosenPreview);
+}
+
+function openKennel(returnTo = "overlay") {
+  if (!mapAvailable()) return;
+  clearInput();
+  latestBestTimes();
+  applySavedSkin();
+  kennel = { focus: Math.max(SKINS.findIndex((skin) => skin.id === skinId), 0), returnTo };
+  SKINS.forEach((skin, index) => drawSkinPreview($("kennel-skins").querySelectorAll(".kennel-preview")[index], skin));
+  syncKennel();
+  $("kennel").hidden = false;
+  setBackgroundInert(true, $("kennel"));
+  focusKennelSkin();
+  wagFrame = requestAnimationFrame(wagChosenPreview);
+  announce(`Dog kennel. ${currentUnlockedSkins().length} of ${SKINS.length} pups unlocked. Playing as ${getSkin(skinId).name} the ${getSkin(skinId).breed}. Use the arrow keys to browse pups.`);
+}
+
+function closeKennel() {
+  if (!kennel) return;
+  const { returnTo } = kennel;
+  kennel = null;
+  cancelAnimationFrame(wagFrame);
+  $("kennel").hidden = true;
+  setBackgroundInert(false);
+  if (returnTo === "map") {
+    openTrailMap();
+    $("trail-map-kennel").focus({ preventScroll: true });
+  } else $("kennel-button").focus({ preventScroll: true });
+}
+
+function pickSkin(index) {
+  if (!kennel) return;
+  kennel.focus = index;
+  const skin = SKINS[index];
+  latestBestTimes();
+  const choice = chooseSkin(skin.id, currentUnlockedSkins());
+  if (choice === null) {
+    const message = `${skin.name} the ${skin.breed} is locked. ${requirementText(skin, LEVELS)} to unlock.`;
+    toast(message);
+    announce(message);
+  } else {
+    skinId = choice;
+    savedPreference(SKIN_KEY, choice);
+    renderer.setSkin(choice);
+    SKINS.forEach((other, otherIndex) => drawSkinPreview($("kennel-skins").querySelectorAll(".kennel-preview")[otherIndex], other));
+    announce(`Playing as ${skin.name} the ${skin.breed}.`);
+  }
+  syncKennel();
+  focusKennelSkin();
+}
+
+window.addEventListener("keydown", (event) => {
+  if (!kennel || $("help-dialog").open || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeKennel();
+    return;
+  }
+  if (event.key === "Tab") {
+    // Two tab stops: the focused pup and Back.
+    event.preventDefault();
+    const onSkin = event.target instanceof Element && event.target.closest(".kennel-skin");
+    if (onSkin) $("kennel-back").focus({ preventScroll: true });
+    else focusKennelSkin();
+    return;
+  }
+  const next = moveSkinFocus(kennel.focus, event.key);
+  if (next !== null) {
+    event.preventDefault();
+    kennel.focus = next;
+    syncKennel();
+    focusKennelSkin();
+  }
+});
+$("kennel-button").addEventListener("click", () => openKennel("overlay"));
+$("kennel-back").addEventListener("click", () => closeKennel());
+buildKennel();
+applySavedSkin();
 
 $("primary-button").addEventListener("click", primaryAction);
 $("pause-button").addEventListener("click", togglePause);
@@ -544,7 +728,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (!event.repeat) unlockAudio();
-  if (trailMap) return;
+  if (trailMap || kennel) return;
   if (["Escape", "KeyP"].includes(event.code) && ["playing", "paused"].includes(game.status)) {
     event.preventDefault();
     if (!event.repeat) togglePause();
