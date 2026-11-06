@@ -331,7 +331,8 @@ function saveBestTimes() {
 }
 
 window.addEventListener("storage", (event) => {
-  if (![`pup-quest:${BEST_TIMES_KEY}`, `pup-quest:${SKIN_KEY}`].includes(event.key)) return;
+  // A null key means another tab cleared all of storage.
+  if (event.key !== null && ![`pup-quest:${BEST_TIMES_KEY}`, `pup-quest:${SKIN_KEY}`].includes(event.key)) return;
   latestBestTimes();
   applySavedSkin();
   if (trailMap) syncTrailMap();
