@@ -494,7 +494,10 @@ function refreshTrailMap() {
   if (secret !== trailMap.secret) {
     const focused = $("trail-map-stops").contains(document.activeElement);
     buildTrailMap(LEVELS.length + (secret ? 1 : 0));
-    trailMap = createTrailMap(trailMap.unlocked, LEVELS.length, trailMap.selected, { secret });
+    const { selected } = trailMap;
+    trailMap = createTrailMap(trailMap.unlocked, LEVELS.length, selected, { secret });
+    // Keep the selected stop (even a locked one) if it is still on the map; only a removed secret stop falls back.
+    if (selected < trailMap.total) trailMap.selected = selected;
     if (focused) focusSelectedStop();
     if (secret) announce(`A secret trail appeared on the Trail Map: ${SECRET_TRAIL.name}!`);
   }
