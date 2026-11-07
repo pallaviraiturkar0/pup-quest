@@ -127,10 +127,9 @@ function stepBoss(game, previousBottom, dt) {
 
 // Whether the pup standing on `surface` has its feet (centre) on ice.
 export function iceUnder(level, surface, player) {
-  if (surface.ice) return true;
-  if (surface.y !== GROUND_Y || !level.ice) return false;
+  const spans = surface.ice ? [surface.ice] : surface.y === GROUND_Y ? level.ice ?? [] : [];
   const centre = player.x + player.w / 2;
-  return level.ice.some((span) => centre >= span.x && centre < span.x + span.w);
+  return spans.some((span) => centre >= span.x && centre < span.x + span.w);
 }
 
 function nearPickup(player, item, radius) {

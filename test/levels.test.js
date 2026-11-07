@@ -198,6 +198,9 @@ test("ice is fair: patches sit on solid ground, clear of ledges, spikes, critter
   assert.ok(platforms.filter((platform) => platform.ice).length >= 3, "a few icy ledges");
   assert.ok(platforms.some((platform) => !platform.ice), "plenty of grippy ledges too");
   const TILE = 16;
+  for (const { x, w, ice: glaze } of platforms.filter((platform) => platform.ice)) {
+    assert.ok(glaze.w >= TILE && glaze.x >= x + TILE && glaze.x + glaze.w <= x + w - TILE, `icy ledge at ${x} keeps a grippy tile at each end`);
+  }
   for (const span of ice) {
     // At least a tile of grippy snow before every cliff edge, so a slide never ends in the water.
     assert.ok(ground.some((block) => span.x >= block.x + TILE && span.x + span.w <= block.x + block.w - TILE), `ice at ${span.x} runs up to a ledge`);

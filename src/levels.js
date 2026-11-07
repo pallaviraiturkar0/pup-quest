@@ -26,8 +26,11 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     start: { x: 48, y: GROUND_Y - 18 },
     ground,
     gaps: gaps.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
-    // A fourth "ice" entry makes a platform slippery.
-    platforms: platforms.map(([x, y, w, surface]) => ({ x: x * TILE, y: y * TILE, w: w * TILE, h: TILE, ice: surface === "ice" })),
+    // A fourth "ice" entry glazes a platform, leaving one grippy tile at each end so the pup never slides off an edge.
+    platforms: platforms.map(([x, y, w, surface]) => ({
+      x: x * TILE, y: y * TILE, w: w * TILE, h: TILE,
+      ice: surface === "ice" ? { x: (x + 1) * TILE, w: (w - 2) * TILE } : null,
+    })),
     // [column, width] stretches of slippery ice on the ground.
     ice: ice.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
     treats: treats.map(([x, y]) => ({ x: x * TILE + 8, y, collected: false })),

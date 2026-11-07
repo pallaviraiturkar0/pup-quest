@@ -80,9 +80,10 @@ const ROUTES = [
 const SECRET_ROUTE = [
   [120, 208], [150, 176, true], [176, 176], [250, 144, true], [274, 144], [345, 176, true], [400, 176],
   [470, 144, true], [514, 144], [570, 176, true], [594, 176], [640, 176, true], [690, 176], [745, 144, true],
-  [770, 144], [825, 112, true], [866, 112], [920, 176, true], [992, 176], [1060, 144, true], [1090, 144],
+  // Short pauses at 930 and 1590 let the patrolling seagulls swoop past first.
+  [770, 144], [825, 112, true], [866, 112], [920, 176, true], [930, 176], [992, 176], [1060, 144, true], [1090, 144],
   [1140, 112, true], [1170, 112], [1240, 176, true], [1298, 176], [1370, 144, true], [1410, 144],
-  [1460, 112, true], [1490, 112], [1530, 176, true], [1600, 176], [1670, 144, true], [1698, 144],
+  [1460, 112, true], [1490, 112], [1530, 176, true], [1600, 176], [1590, 176], [1600, 176], [1670, 144, true], [1698, 144],
   [1750, 112, true], [1790, 112], [1850, 176, true], [1940, 208], [1990, 160, true], [2080, 208, true], [2160, 208],
 ];
 
@@ -117,8 +118,10 @@ function fightBoss(game) {
   for (const [x, floor, jump] of BOSS_FIGHT.home) travel(game, x, floor, jump);
 }
 
+// Returns how many frames the pup spent standing on ice along the way.
 function travel(game, x, floor, jump = false) {
   let airborne = false;
+  let iceFrames = 0;
   for (let frame = 0; frame < 1600; frame += 1) {
     const p = game.player;
     const distance = x - p.x;
@@ -132,11 +135,12 @@ function travel(game, x, floor, jump = false) {
     }, 1 / 120);
     game.events.length = 0;
     airborne ||= !game.player.grounded;
+    if (game.player.onIce) iceFrames += 1;
     assert.equal(game.deaths, 0, `${game.level.name}: lost a life en route to ${x}/${floor}`);
-    if (game.status !== "playing") return;
+    if (game.status !== "playing") return iceFrames;
     if (Math.abs(game.player.x - x) < 2 && Math.abs(game.player.vx) < 10 &&
         game.player.grounded && Math.abs(game.player.y + game.player.h - floor) < 1 &&
-        (!jump || airborne)) return;
+        (!jump || airborne)) return iceFrames;
   }
   assert.fail(`${game.level.name}: cannot reach ${x}/${floor}; stopped at ${game.player.x.toFixed(1)}/${(game.player.y + game.player.h).toFixed(1)}`);
 }
@@ -167,12 +171,9 @@ test("a real-input run of the secret icy trail finds the key and wins inside gol
   const game = createGame(SECRET_INDEX);
   startGame(game);
   stepGame(game);
-  let iceStops = 0;
-  for (const [x, floor, jump] of SECRET_ROUTE) {
-    travel(game, x, floor, jump);
-    if (game.player.onIce) iceStops += 1;
-  }
-  assert.ok(iceStops >= 4, "the route really stops on the ice");
+  let iceFrames = 0;
+  for (const [x, floor, jump] of SECRET_ROUTE) iceFrames += travel(game, x, floor, jump);
+  assert.ok(iceFrames >= 120, `the route really crosses the ice (${iceFrames} frames)`);
   assert.equal(game.keyFound, true);
   assert.equal(game.status, "won");
   assert.equal(medalFor(runMs(game.levelTime), game.level.par), "gold", `${game.levelTime.toFixed(2)}s misses gold`);

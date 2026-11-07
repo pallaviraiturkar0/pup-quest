@@ -881,7 +881,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     for (const ground of game.level.ground) terrain(ground, palette, false, game.cameraX);
     for (const platform of game.level.platforms) terrain(platform, palette, true, game.cameraX);
     for (const span of game.level.ice ?? []) iceSheet(span.x, GROUND_Y, span.w, false, game.cameraX);
-    for (const platform of game.level.platforms) if (platform.ice) iceSheet(platform.x, platform.y, platform.w, true, game.cameraX);
+    for (const { ice, y } of game.level.platforms) if (ice) iceSheet(ice.x, y, ice.w, true, game.cameraX);
     for (const spike of game.level.spikes) {
       for (let x = spike.x; x < spike.x + spike.w; x += 7) {
         rect(x, spike.y + 5, 6, 3, "#748273");

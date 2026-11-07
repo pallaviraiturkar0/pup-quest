@@ -243,7 +243,8 @@ function updateUi() {
   }
   $("best-score").textContent = String(bestScore).padStart(4, "0");
   document.querySelectorAll("[data-trail]").forEach((trail, index) => {
-    const done = index < game.levelIndex || game.status === "won";
+    // A secret run is not campaign progress, so show the trails actually cleared on this device.
+    const done = game.level.secret ? index < unlockedTrails - 1 || bestTimes[index] !== null : index < game.levelIndex || game.status === "won";
     const current = index === game.levelIndex;
     trail.classList.toggle("active", current);
     if (current) trail.setAttribute("aria-current", "step");
@@ -347,7 +348,7 @@ window.addEventListener("storage", (event) => {
   if (event.key !== null && ![`pup-quest:${BEST_TIMES_KEY}`, `pup-quest:${SKIN_KEY}`].includes(event.key)) return;
   latestBestTimes();
   applySavedSkin();
-  if (trailMap) syncTrailMap();
+  if (trailMap) refreshTrailMap();
   if (kennel) syncKennel();
 });
 
@@ -485,6 +486,19 @@ function setBackgroundInert(on, dialog = $("trail-map")) {
 
 function focusSelectedStop() {
   $("trail-map-stops").querySelector(`[data-stop="${trailMap.selected}"]`)?.focus({ preventScroll: true });
+}
+
+// Adds (or removes) the secret stop when another tab changes the saved times, keeping the selection and focus.
+function refreshTrailMap() {
+  const secret = secretTrailOpen(bestTimes, LEVELS);
+  if (secret !== trailMap.secret) {
+    const focused = $("trail-map-stops").contains(document.activeElement);
+    buildTrailMap(LEVELS.length + (secret ? 1 : 0));
+    trailMap = createTrailMap(trailMap.unlocked, LEVELS.length, trailMap.selected, { secret });
+    if (focused) focusSelectedStop();
+    if (secret) announce(`A secret trail appeared on the Trail Map: ${SECRET_TRAIL.name}!`);
+  }
+  syncTrailMap();
 }
 
 function openTrailMap() {

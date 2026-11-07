@@ -295,8 +295,10 @@ test("ice only affects grip on the ground, never in the air or on ordinary trail
   const level = game.level;
   const icy = level.platforms.find((platform) => platform.ice);
   const grippy = level.platforms.find((platform) => !platform.ice);
-  const pup = { x: icy.x, w: 14 };
-  assert.equal(iceUnder(level, icy, pup), true);
+  const centredAt = (x) => ({ x: x - 7, w: 14 });
+  assert.equal(iceUnder(level, icy, centredAt(icy.x + icy.w / 2)), true, "the middle of an icy ledge is slippery");
+  assert.equal(iceUnder(level, icy, centredAt(icy.x + 4)), false, "its left edge is grippy");
+  assert.equal(iceUnder(level, icy, centredAt(icy.x + icy.w - 4)), false, "its right edge is grippy");
   assert.equal(iceUnder(level, grippy, { x: grippy.x, w: 14 }), false);
   const ground = level.ground.find((block) => block.x <= level.ice[0].x && block.x + block.w >= level.ice[0].x + level.ice[0].w);
   assert.equal(iceUnder(level, ground, { x: level.ice[0].x - 7 + 1, w: 14 }), true, "feet over the ice");

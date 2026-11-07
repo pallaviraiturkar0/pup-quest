@@ -68,7 +68,7 @@ Pick **Trail map** on the title screen (or after a game over or victory) to see 
 A hidden bonus trail appears on the Trail Map as a glowing ★ stop after you either **earn a gold paw medal on any trail** or **beat the Mega-Vac on Trail 07**. A toast and screen-reader announcement mark the moment it appears. It is worked out from your saved best times, so no extra save data is needed, and it stays open on that device. Finding it never unlocks campaign trails.
 
 - Frosty Fjord is a single-trail challenge under an aurora with falling snow and icy parallax peaks. Clearing it shows its own victory screen, and **Slide again** replays it.
-- Glossy blue **ice** covers some ground patches and ledges. On ice Biscuit has 30% of his usual grip, so he speeds up and stops more slowly (a full-speed slide carries about a tile and a half). Top speed, jumping, and air control are unchanged, and ice is never placed next to a ledge edge, a spike, a critter's patrol, or a start, checkpoint, or exit.
+- Glossy blue **ice** covers some ground patches and ledges. On ice Biscuit has 30% of his usual grip, so he speeds up and stops more slowly (a full-speed slide carries about a tile and a half). Top speed, jumping, and air control are unchanged, and icy ledges keep a grippy tile at each end, and ground ice is never placed next to a cliff edge, a spike, a critter's patrol, or a start, checkpoint, or exit.
 - It is timed like every trail, with its own par times and paw medal, saved as trail 8 in `pup-quest:best-times`.
 
 ### Time trials and paw medals

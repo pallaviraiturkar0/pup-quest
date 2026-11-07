@@ -74,7 +74,7 @@ test("ice is drawn on the secret trail's slippery ground and ledges", () => {
   const span = game.level.ice[0];
   const ledge = game.level.platforms.find((platform) => platform.ice && platform.x < VIEW_WIDTH);
   assert.ok(sheets.some((sheet) => sheet.x === span.x && sheet.w === span.w), "ground ice");
-  assert.ok(sheets.some((sheet) => sheet.x === ledge.x && sheet.w === ledge.w), "icy ledge");
+  assert.ok(sheets.some((sheet) => sheet.x === ledge.ice.x && sheet.w === ledge.ice.w), "only the icy ledge's slippery middle");
   assert.equal(sheetsOn(createGame(0)).length, 0, "no ice on the meadow");
 });
 
