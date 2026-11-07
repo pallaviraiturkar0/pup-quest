@@ -4,7 +4,7 @@
 
 **[Play Pup Quest](https://pallaviraiturkar0.github.io/pup-quest/)**
 
-Run, jump, collect treats, and find the golden key to open the doghouse. Explore seven handcrafted trails: Sunny Meadow, Mossy Hollow, Starlit Summit, Puppy Park, Seashell Shore, Neon Nightwalk, and the finale, Moonlit Keep, where a boss guards the last golden key. Inspired by the approachable platforming of DOS-era games like Dangerous Dave, with entirely original code, levels, artwork, and synthesized sound effects.
+Run, jump, collect treats, and find the golden key to open the doghouse. Explore seven handcrafted trails: Sunny Meadow, Mossy Hollow, Starlit Summit, Puppy Park, Seashell Shore, Neon Nightwalk, and the finale, Moonlit Keep, where a boss guards the last golden key. Skilled pups can also uncover a secret eighth trail, Frosty Fjord. Inspired by the approachable platforming of DOS-era games like Dangerous Dave, with entirely original code, levels, artwork, and synthesized sound effects.
 
 ## Controls
 
@@ -63,6 +63,14 @@ Pick **Trail map** on the title screen (or after a game over or victory) to see 
 - Starting from the map plays from that trail to the finale with three fresh hearts. Trying again after a game over restarts from the trail you picked; playing again after a victory starts over from Trail 01.
 - With **prefers-reduced-motion**, the marching trail and hopping paw animations are turned off.
 
+### Secret trail: Frosty Fjord
+
+A hidden bonus trail appears on the Trail Map as a glowing ★ stop after you either **earn a gold paw medal on any trail** or **beat the Mega-Vac on Trail 07**. A toast and screen-reader announcement mark the moment it appears. It is worked out from your saved best times, so no extra save data is needed, and it stays open on that device. Finding it never unlocks campaign trails.
+
+- Frosty Fjord is a single-trail challenge under an aurora with falling snow and icy parallax peaks. Clearing it shows its own victory screen, and **Slide again** replays it.
+- Glossy blue **ice** covers some ground patches and ledges. On ice Biscuit has 30% of his usual grip, so he speeds up and stops more slowly (a full-speed slide carries about a tile and a half). Top speed, jumping, and air control are unchanged, and ice is never placed next to a ledge edge, a spike, a critter's patrol, or a start, checkpoint, or exit.
+- It is timed like every trail, with its own par times and paw medal, saved as trail 8 in `pup-quest:best-times`.
+
 ### Time trials and paw medals
 
 Every trail run is timed. The clock in the top-right corner of the game starts when the trail starts, keeps running after a lost heart, and stops whenever the game is paused (including when the window loses focus or the help dialog is open). Restarting a trail resets it.
@@ -78,6 +86,7 @@ Clear a trail to see your run time, your best time, and a paw medal on the level
 | 05 Seashell Shore | 0:35 | 0:48 | 1:12 |
 | 06 Neon Nightwalk | 0:34 | 0:46 | 1:10 |
 | 07 Moonlit Keep | 0:48 | 1:06 | 1:40 |
+| ★ Frosty Fjord (secret) | 0:32 | 0:44 | 1:06 |
 
 Gold is about 10% slower than the full-campaign input replay used in the tests (which checks that it earns gold on every trail), so it rewards a clean, confident run without needing frame-perfect play. Slower clears still count; they just don't earn a medal yet.
 
@@ -128,12 +137,12 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Time-trial tests cover the pause-aware trail timer, medal thresholds, best-time parsing and saving, keeping the faster time from another tab (including overlapping saves under the lock), time formatting, and medal art contrast. Kennel tests cover skin data validity (palettes, ears, tails, markings, and unlock rules), every coat drawing inside the sprite box, medal-based unlock rules and progress, requirement wording, picking only unlocked pups, and falling back to Biscuit for missing, corrupt, unknown, or locked saves. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Time-trial tests cover the pause-aware trail timer, medal thresholds, best-time parsing and saving, keeping the faster time from another tab (including overlapping saves under the lock), time formatting, and medal art contrast. Kennel tests cover skin data validity (palettes, ears, tails, markings, and unlock rules), every coat drawing inside the sprite box, medal-based unlock rules and progress, requirement wording, picking only unlocked pups, and falling back to Biscuit for missing, corrupt, unknown, or locked saves. Secret-trail tests cover its unlock rules (gold paw or boss clear only), the extra map stop, ice traction, slide length and air control, ice fairness, the arctic theme's aurora, snow, and ice drawing, and a real-input run that wins it with gold. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
 - `src/engine.js`: deterministic game rules and fixed-step physics.
-- `src/levels.js`: seven handcrafted trails and their collectible/platform layouts. A trail can add `boss: { x, left, right }` (in columns) to place a boss arena.
+- `src/levels.js`: seven handcrafted trails plus the secret Frosty Fjord (`TRAILS` lists all eight) and their collectible/platform layouts. A trail can add `boss: { x, left, right }` (in columns) to place a boss arena. Icy ground spans are `ice: [[column, width]]`, and a platform tuple can end with `"ice"`.
 - `src/boss.js`: the Mega-Vac boss state machine, stomp rules, and arena reset.
 - `src/enemies.js`: data-driven critters (squirrels, robot vacuums, seagulls, alley cats) with their movement rules. Levels place them with objects such as `{ type: "cat", x, left, right, speed, row }`; plain `[x, left, right, speed]` tuples are ground squirrels.
 - `src/powerups.js`: bone treat, zoomies, and squeaky toy rules (pickup, effects, and timers). Levels place them as `[type, column, y]` tuples.
@@ -142,7 +151,7 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 - `src/audio.js`: procedural sound recipes (pure data) plus a small Web Audio adapter that handles gesture unlock, mute, and saved preference.
 - `src/particles.js`: capped, DOM-free particle pool with dust, sparkle, paw-print, and confetti bursts, and reduced-motion fallbacks.
 - `src/medals.js`: DOM-free time-trial logic: medals from par times, best-time storage and merging, time formatting, and the medal art.
-- `src/trailmap.js`: DOM-free Trail Map logic: reading and advancing unlock progress, keyboard selection, locked-trail rules, the seeded winding path, and per-theme stop colours.
+- `src/trailmap.js`: DOM-free Trail Map logic: reading and advancing unlock progress, keyboard selection, locked-trail rules, the secret-trail unlock, the seeded winding path, and per-theme stop colours.
 - `src/kennel.js`: DOM-free Dog Kennel logic: pup skin data, medal-based unlock rules, saved-skin fallback, and the shared procedural pup sprite used by gameplay and the Kennel previews.
 - `src/touch.js`: touch-to-action logic (pointer tracking, paw hit-testing, touch-device detection) and the procedural paw-print button art, kept DOM-free so it runs under node tests.
 - `src/main.js`: keyboard controls, wiring for the touch paws, menus, the Trail Map and Dog Kennel, accessibility announcements, and saved scores.
@@ -152,7 +161,7 @@ No frameworks, downloaded assets, trackers, analytics, external fonts, backend, 
 
 ## Themed backgrounds
 
-Every backdrop is drawn procedurally from data in `src/themes.js`: a palette plus an ordered list of parallax layers (sun or moon, stars, clouds, birds, sea, hills, dunes, city skylines, castle towers, trees, palms, hedges, and street lamps). A level picks its backdrop with its `theme` field; unknown names fall back to the meadow. The first three trails use the meadow, forest, and starlit night; Puppy Park, Seashell Shore, Neon Nightwalk, and Moonlit Keep use the **park**, **beach**, **city** (night city), and **castle** (moonlit castle) themes. Preview any theme on any trail with a query string, for example `?theme=beach` or `?theme=castle`.
+Every backdrop is drawn procedurally from data in `src/themes.js`: a palette plus an ordered list of parallax layers (sun or moon, stars, clouds, birds, sea, hills, dunes, city skylines, castle towers, trees, palms, hedges, street lamps, auroras, glaciers, and falling snow). A level picks its backdrop with its `theme` field; unknown names fall back to the meadow. The first three trails use the meadow, forest, and starlit night; Puppy Park, Seashell Shore, Neon Nightwalk, and Moonlit Keep use the **park**, **beach**, **city** (night city), and **castle** (moonlit castle) themes, and the secret Frosty Fjord uses **arctic** (aurora, glaciers, snowdrifts, and a snowman). Preview any theme on any trail with a query string, for example `?theme=beach`, `?theme=castle`, or `?theme=arctic`. Falling snow and the aurora hold still with **prefers-reduced-motion**.
 
 ## Free hosting
 

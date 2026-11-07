@@ -204,6 +204,9 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
 .trail-stop.locked { background: #e7e6dc; border-color: #b9b9ad; border-style: dashed; }
 .trail-stop.selected { transform: scale(1.15); box-shadow: 0 0 0 3px #fffdf0, 0 0 0 6px var(--orange); }
 .trail-stop.selected:not(.locked) .paw { animation: paw-hop .9s ease-in-out infinite; }
+.trail-stop.secret { box-shadow: 0 0 0 3px #a7d3ea80, 0 0 14px 4px #79c9ff99; }
+.trail-stop.secret.selected { box-shadow: 0 0 0 3px #fffdf0, 0 0 0 6px #79c9ff, 0 0 16px 6px #6ff0bf88; }
+.trail-stop.secret .trail-stop-label { color: #2b4a6b; }
 @keyframes paw-hop { 50% { transform: translateY(-3px); } }
 .trail-stop-label { position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%); white-space: nowrap; font: 600 8px var(--mono); letter-spacing: .5px; color: #4d5c45; background: #fffdf0e6; padding: 2px 4px; border-radius: 2px; pointer-events: none; }
 .trail-stop.locked .trail-stop-label { color: #5f6656; }

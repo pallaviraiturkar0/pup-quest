@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { enemyReach } from "../src/enemies.js";
-import { intersects, PHYSICS } from "../src/engine.js";
-import { GROUND_Y, LEVELS, VIEW_HEIGHT } from "../src/levels.js";
+import { ICE, intersects, PHYSICS } from "../src/engine.js";
+import { GROUND_Y, LEVELS, SECRET_INDEX, SECRET_TRAIL, TRAILS, VIEW_HEIGHT } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
 
 const PUPPY = { w: 14, h: 18 };
@@ -87,7 +87,7 @@ test("new trails get progressively longer and busier after Starlit Summit", () =
 });
 
 test("every level object stays inside the level bounds", () => {
-  for (const level of LEVELS) {
+  for (const level of TRAILS) {
     const inside = (thing, label) => {
       assert.ok(thing.x >= 0 && thing.x + (thing.w ?? 0) <= level.width, `${level.name}: ${label} x out of bounds`);
       assert.ok(thing.y >= 0 && thing.y + (thing.h ?? 0) <= VIEW_HEIGHT + 80, `${level.name}: ${label} y out of bounds`);
@@ -109,7 +109,7 @@ test("every level object stays inside the level bounds", () => {
 });
 
 test("the spawn point is clear of solids, spikes, and critters, and stands on ground", () => {
-  for (const level of LEVELS) {
+  for (const level of TRAILS) {
     const puppy = { ...level.start, ...PUPPY };
     assert.ok(solids(level).every((solid) => !intersects(puppy, solid)), `${level.name}: spawn overlaps a solid`);
     assert.ok(level.spikes.every((spike) => !intersects(puppy, spike)), `${level.name}: spawn overlaps spikes`);
@@ -120,7 +120,7 @@ test("the spawn point is clear of solids, spikes, and critters, and stands on gr
 });
 
 test("pickups are never buried inside solid ground or platforms", () => {
-  for (const level of LEVELS) {
+  for (const level of TRAILS) {
     for (const [index, item] of [...level.treats, ...level.powerups, level.key].entries()) {
       assert.ok(solids(level).every((solid) => !intersects(box(item), solid)), `${level.name}: pickup ${index} is inside a solid`);
     }
@@ -128,7 +128,7 @@ test("pickups are never buried inside solid ground or platforms", () => {
 });
 
 test("hazards sit on solid ground and critters never wander out over water", () => {
-  for (const level of LEVELS) {
+  for (const level of TRAILS) {
     for (const spike of level.spikes) {
       assert.ok(level.ground.some((ground) => spike.x >= ground.x && spike.x + spike.w <= ground.x + ground.w), `${level.name}: spike at ${spike.x} floats over a gap`);
     }
@@ -165,7 +165,7 @@ test("the static jump check agrees with the physics", () => {
 });
 
 test("on every trail the golden key, power-ups, and the doghouse are reachable with ordinary jumps", () => {
-  for (const level of LEVELS) {
+  for (const level of TRAILS) {
     const { surfaces, reachable } = reachableSurfaces(level);
     const exitFloor = surfaceUnder(surfaces.filter((surface) => surface.id.startsWith("ground")), level.exit.x + 8);
     assert.ok(exitFloor, `${level.name}: the doghouse has no ground under it`);
@@ -177,5 +177,56 @@ test("on every trail the golden key, power-ups, and the doghouse are reachable w
     for (const platform of surfaces) {
       assert.ok(reachable.has(platform), `${level.name}: ${platform.id} at x=${platform.x0}, y=${platform.y} cannot be reached`);
     }
+  }
+});
+
+test("Frosty Fjord is a secret arctic trail kept outside the campaign", () => {
+  assert.equal(SECRET_TRAIL.name, "Frosty Fjord");
+  assert.equal(SECRET_TRAIL.theme, "arctic");
+  assert.equal(SECRET_TRAIL.secret, true);
+  assert.equal(SECRET_INDEX, LEVELS.length);
+  assert.equal(TRAILS[SECRET_INDEX], SECRET_TRAIL);
+  assert.ok(LEVELS.every((level) => !level.secret && level.ice.length === 0 && level.platforms.every((platform) => !platform.ice)),
+    "campaign trails keep their grip");
+  assert.equal(SECRET_TRAIL.boss, null);
+  assert.ok(!TRAILS.slice(0, -1).some((level) => level.name === SECRET_TRAIL.name));
+});
+
+test("ice is fair: patches sit on solid ground, clear of ledges, spikes, critters, and checkpoints", () => {
+  const { ice, ground, spikes, enemies, platforms, checkpoint, start, exit } = SECRET_TRAIL;
+  assert.ok(ice.length >= 3, "a few ground patches");
+  assert.ok(platforms.filter((platform) => platform.ice).length >= 3, "a few icy ledges");
+  assert.ok(platforms.some((platform) => !platform.ice), "plenty of grippy ledges too");
+  const TILE = 16;
+  for (const span of ice) {
+    // At least a tile of grippy snow before every cliff edge, so a slide never ends in the water.
+    assert.ok(ground.some((block) => span.x >= block.x + TILE && span.x + span.w <= block.x + block.w - TILE), `ice at ${span.x} runs up to a ledge`);
+    for (const spike of spikes) {
+      assert.ok(spike.x >= span.x + span.w + TILE * 2 || spike.x + spike.w <= span.x - TILE * 2, `spike at ${spike.x} is too close to ice at ${span.x}`);
+    }
+    for (const enemy of enemies.filter((critter) => critter.floor === GROUND_Y && critter.type !== "seagull")) {
+      assert.ok(enemy.right + enemy.w <= span.x || enemy.left >= span.x + span.w, `${enemy.type} at ${enemy.x} patrols the ice`);
+    }
+    for (const x of [start.x, checkpoint.x + 12, exit.x]) {
+      assert.ok(x + PUPPY.w <= span.x || x >= span.x + span.w, `respawn or exit at ${x} is on ice`);
+    }
+  }
+});
+
+test("every hop off an icy ledge is makeable from a standing start", () => {
+  const { surfaces } = reachableSurfaces(SECRET_TRAIL);
+  const icy = SECRET_TRAIL.platforms.filter((platform) => platform.ice);
+  for (const platform of icy) {
+    // From a standstill on ice, a pup builds up speed over the ledge's width before leaping.
+    const runUp = platform.w - PUPPY.w;
+    const launch = Math.min(PHYSICS.speed, Math.sqrt(2 * PHYSICS.acceleration * ICE.traction * runUp));
+    assert.ok(launch >= PHYSICS.speed * 0.9, `ice ledge at x=${platform.x} is too short to get going`);
+    const from = surfaces.find((surface) => surface.x0 === platform.x && surface.y === platform.y);
+    // Jump reach scales with take-off speed.
+    const onward = surfaces.filter((to) => {
+      if (to === from || to.x0 <= from.x1 || from.y - to.y > JUMP_HEIGHT - RISE_MARGIN) return false;
+      return to.x0 - from.x1 - PUPPY.w + REACH_MARGIN <= horizontalReach(from.y - to.y) * launch / PHYSICS.speed;
+    });
+    assert.ok(onward.length > 0, `nowhere to hop to from the ice ledge at x=${platform.x}`);
   }
 });

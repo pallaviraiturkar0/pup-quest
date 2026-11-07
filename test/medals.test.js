@@ -5,7 +5,7 @@ import {
   recordBestTime, runMs, serializeBestTimes, spokenTime, withSaveLock,
 } from "../src/medals.js";
 import { createGame, pauseGame, resumeGame, startGame, stepGame } from "../src/engine.js";
-import { LEVELS } from "../src/levels.js";
+import { LEVELS, TRAILS } from "../src/levels.js";
 import { contrastRatio } from "../src/trailmap.js";
 
 const TOTAL = LEVELS.length;
@@ -43,10 +43,19 @@ test("medals follow each trail's par times, inclusive of the par itself", () => 
 });
 
 test("every trail has ordered, positive par times", () => {
-  for (const level of LEVELS) {
+  for (const level of TRAILS) {
     const { gold, silver, bronze } = level.par;
     assert.ok(gold > 0 && gold < silver && silver < bronze, `${level.name} pars are ordered`);
   }
+});
+
+test("the secret trail's best time is saved under its own trail number", () => {
+  const times = Array(TRAILS.length).fill(null);
+  times[TRAILS.length - 1] = 30_000;
+  const raw = serializeBestTimes(times);
+  assert.equal(raw, `{"${TRAILS.length}":30000}`);
+  assert.deepEqual(parseBestTimes(raw, TRAILS.length), times);
+  assert.deepEqual(parseBestTimes('{"1":20000}', TRAILS.length).slice(0, 2), [20_000, null], "older saves still load");
 });
 
 test("saved best times survive missing, corrupt, and tampered data", () => {
