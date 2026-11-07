@@ -1,6 +1,6 @@
 import { BOSS, bossDangerous, bossDefeated, resetBoss, stompBoss, updateBoss } from "./boss.js";
 import { updateEnemy } from "./enemies.js";
-import { LEVELS, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
+import { GROUND_Y, LEVELS, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
 import { applyPowerup, isScared, PICKUP_RADIUS, speedMultiplier, tickPlayerPowerups, tickScared } from "./powerups.js";
 
 export const PHYSICS = Object.freeze({
@@ -15,6 +15,10 @@ export const PHYSICS = Object.freeze({
   landingSpeed: 120,
 });
 
+// Ice keeps top speed and air control but cuts grip, so the pup speeds up and stops more slowly.
+// At full speed a pup slides about 1.4 tiles after letting go: noticeable, never a trap.
+export const ICE = Object.freeze({ traction: 0.3 });
+
 export function intersects(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -23,11 +27,11 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const approach = (value, target, amount) => value < target ? Math.min(value + amount, target) : Math.max(value - amount, target);
 
 function playerAt(x, y) {
-  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0 };
+  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, onIce: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0 };
 }
 
 function loadLevel(game) {
-  game.level = structuredClone(LEVELS[game.levelIndex]);
+  game.level = structuredClone(TRAILS[game.levelIndex]);
   game.player = playerAt(game.level.start.x, game.level.start.y);
   game.cameraX = 0;
   game.keyFound = false;
@@ -37,7 +41,7 @@ function loadLevel(game) {
 }
 
 export function createGame(startIndex = 0) {
-  const first = Number.isInteger(startIndex) && startIndex >= 0 && startIndex < LEVELS.length ? startIndex : 0;
+  const first = Number.isInteger(startIndex) && startIndex >= 0 && startIndex < TRAILS.length ? startIndex : 0;
   const game = {
     status: "ready", levelIndex: first, startIndex: first, lives: 3, score: 0, totalTreats: 0,
     elapsed: 0, events: [], deaths: 0,
@@ -121,6 +125,13 @@ function stepBoss(game, previousBottom, dt) {
   return bossDangerous(boss) && loseLife(game, "boss");
 }
 
+// Whether the pup standing on `surface` has its feet (centre) on ice.
+export function iceUnder(level, surface, player) {
+  const spans = surface.ice ? [surface.ice] : surface.y === GROUND_Y ? level.ice ?? [] : [];
+  const centre = player.x + player.w / 2;
+  return spans.some((span) => centre >= span.x && centre < span.x + span.w);
+}
+
 function nearPickup(player, item, radius) {
   return intersects(player, { x: item.x - radius, y: item.y - radius, w: radius * 2, h: radius * 2 });
 }
@@ -137,7 +148,8 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   p.buffer = input.jumpPressed ? PHYSICS.jumpBuffer : Math.max(0, p.buffer - dt);
 
   const direction = Number(Boolean(input.right)) - Number(Boolean(input.left));
-  p.vx = approach(p.vx, direction * PHYSICS.speed * speedMultiplier(p), PHYSICS.acceleration * dt);
+  const grip = p.grounded && p.onIce ? ICE.traction : 1;
+  p.vx = approach(p.vx, direction * PHYSICS.speed * speedMultiplier(p), PHYSICS.acceleration * grip * dt);
   if (direction) p.facing = direction;
   if (p.buffer > 0 && p.coyote > 0) {
     p.vy = -PHYSICS.jump;
@@ -161,12 +173,14 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   const wasGrounded = p.grounded;
   const impactSpeed = p.vy;
   p.grounded = false;
+  p.onIce = false;
   for (const surface of [...level.ground, ...level.platforms]) {
     if (p.vy >= 0 && previousBottom <= surface.y + 0.1 &&
         p.y + p.h >= surface.y && p.x + p.w > surface.x && p.x < surface.x + surface.w) {
       p.y = surface.y - p.h;
       p.vy = 0;
       p.grounded = true;
+      p.onIce ||= iceUnder(level, surface, p);
     }
   }
   p.stride += Math.abs(p.vx) * dt;
@@ -219,7 +233,8 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   if (intersects(p, level.exit)) {
     if (game.keyFound) {
       game.score += game.lives * 50;
-      game.status = game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
+      // The finale and the secret trail both end the run; other trails lead on to the next.
+      game.status = level.secret || game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
       game.events.push({ type: game.status, x: level.exit.x + level.exit.w / 2, y: level.exit.y });
     } else if (game.exitHintCooldown === 0) {
       game.exitHintCooldown = 3;

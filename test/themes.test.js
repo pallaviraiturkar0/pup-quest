@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame } from "../src/engine.js";
-import { LEVELS, VIEW_WIDTH } from "../src/levels.js";
+import { LEVELS, SECRET_INDEX, SECRET_TRAIL, VIEW_WIDTH } from "../src/levels.js";
 import { createRenderer } from "../src/render.js";
 import {
   DEFAULT_THEME, getTheme, LANDMARK_KINDS, LAYER_KINDS, PALETTE_KEYS, resolveColor,
@@ -21,6 +21,61 @@ test("the new park, beach, and night city backdrops are available", () => {
   assert.ok(THEMES.beach.layers.some((layer) => layer.kind === "sea"));
   assert.ok(THEMES.city.layers.filter((layer) => layer.kind === "skyline").length >= 2);
   assert.ok(THEMES.park.layers.some((layer) => layer.kind === "lamps"));
+});
+
+test("the arctic theme brings an aurora, icy parallax peaks, and falling snow", () => {
+  assert.equal(themeForLevel(SECRET_TRAIL), THEMES.arctic);
+  const kinds = THEMES.arctic.layers.map((layer) => layer.kind);
+  for (const kind of ["aurora", "glaciers", "snow"]) assert.ok(kinds.includes(kind), kind);
+  assert.ok(kinds.filter((kind) => kind === "glaciers").length >= 2, "two parallax rows of ice");
+  const aurora = THEMES.arctic.layers.find((layer) => layer.kind === "aurora");
+  assert.ok(aurora.colors.length >= 2 && aurora.colors.every((color) => HEX.test(resolveColor(THEMES.arctic, color))));
+  assert.equal(THEMES.arctic.decor.landmark, "snowman");
+});
+
+test("snow falls over time but holds still with reduced motion", () => {
+  const snow = THEMES.arctic.layers.find((layer) => layer.kind === "snow");
+  const flakesAt = (time, reducedMotion) => {
+    const spots = [];
+    let fill = "";
+    const noop = () => {};
+    const ctx = {
+      globalAlpha: 1, font: "", imageSmoothingEnabled: false,
+      set fillStyle(value) { fill = value; }, get fillStyle() { return fill; },
+      fillRect(x, y) { if (fill === snow.color) spots.push(`${x},${y}`); },
+      beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop,
+      save: noop, restore: noop, translate: noop, scale: noop, fillText: noop,
+    };
+    const game = createGame(SECRET_INDEX);
+    createRenderer({ getContext: () => ctx }).render(game, time, 0, reducedMotion);
+    return spots.join(" ");
+  };
+  assert.notEqual(flakesAt(1, false), flakesAt(3, false));
+  assert.equal(flakesAt(1, true), flakesAt(3, true));
+});
+
+test("ice is drawn on the secret trail's slippery ground and ledges", () => {
+  const sheetsOn = (game) => {
+    const sheets = [];
+    let fill = "";
+    const noop = () => {};
+    const ctx = {
+      globalAlpha: 1, font: "", imageSmoothingEnabled: false,
+      set fillStyle(value) { fill = value; }, get fillStyle() { return fill; },
+      fillRect(x, y, w) { if (fill === "#b9e1f2" && w > 8) sheets.push({ x, y, w }); },
+      beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop,
+      save: noop, restore: noop, translate: noop, scale: noop, fillText: noop,
+    };
+    createRenderer({ getContext: () => ctx }).render(game, 0, 0, true);
+    return sheets;
+  };
+  const game = createGame(SECRET_INDEX);
+  const sheets = sheetsOn(game);
+  const span = game.level.ice[0];
+  const ledge = game.level.platforms.find((platform) => platform.ice && platform.x < VIEW_WIDTH);
+  assert.ok(sheets.some((sheet) => sheet.x === span.x && sheet.w === span.w), "ground ice");
+  assert.ok(sheets.some((sheet) => sheet.x === ledge.ice.x && sheet.w === ledge.ice.w), "only the icy ledge's slippery middle");
+  assert.equal(sheetsOn(createGame(0)).length, 0, "no ice on the meadow");
 });
 
 test("theme palettes are complete hex colors", () => {

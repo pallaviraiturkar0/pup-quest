@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  chooseTrail, contrastRatio, createTrailMap, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, stopColors, trailPath, unlockAfterClear,
+  chooseTrail, contrastRatio, createTrailMap, isStopOpen, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, secretTrailOpen, stopColors,
+  trailPath, unlockAfterClear,
 } from "../src/trailmap.js";
 import { createGame, nextLevel, restartGame, startGame } from "../src/engine.js";
-import { LEVELS } from "../src/levels.js";
+import { LEVELS, SECRET_INDEX } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
 
 const TOTAL = LEVELS.length;
@@ -112,4 +113,32 @@ test("each stop is tinted by its trail's theme with a paw that meets 3:1 contras
   assert.equal(stopColors("castle").ink, THEMES.castle.palette.flower, "night skies keep a themed light ink");
   assert.equal(stopColors("forest").ink, THEMES.forest.palette.tree, "the theme's tree colour is used when it is readable");
   assert.equal(stopColors("beach").ink, "#283d32", "falls back to page ink when no theme colour is readable");
+});
+
+test("the secret trail opens after beating the Mega-Vac or earning any gold paw", () => {
+  const times = (entries = {}) => Array.from({ length: TOTAL + 1 }, (_, index) => entries[index] ?? null);
+  const par = (index, medal) => LEVELS[index].par[medal] * 1000;
+  assert.equal(secretTrailOpen(times(), LEVELS), false, "a fresh save keeps it hidden");
+  assert.equal(secretTrailOpen(null, LEVELS), false);
+  assert.equal(secretTrailOpen(times({ 0: par(0, "silver"), 3: par(3, "bronze") }), LEVELS), false, "silver and bronze are not enough");
+  assert.equal(secretTrailOpen(times({ 2: par(2, "gold") }), LEVELS), true, "a gold paw on any trail");
+  assert.equal(secretTrailOpen(times({ [TOTAL - 1]: par(TOTAL - 1, "bronze") * 2 }), LEVELS), true, "any clear of the boss finale");
+  assert.equal(secretTrailOpen(times({ [TOTAL]: 1000 }), LEVELS), false, "its own time cannot open it");
+  assert.equal(secretTrailOpen(times({ [TOTAL - 1]: -5 }), LEVELS), false, "tampered times are ignored");
+});
+
+test("once found, the secret trail is an extra open stop on the map, even with campaign trails still locked", () => {
+  const hidden = createTrailMap(2, TOTAL);
+  assert.equal(hidden.total, TOTAL);
+  assert.equal(chooseTrail(hidden, SECRET_INDEX), null);
+  const map = createTrailMap(2, TOTAL, 1, { secret: true });
+  assert.equal(map.total, TOTAL + 1);
+  assert.equal(isStopOpen(map, SECRET_INDEX), true);
+  assert.equal(isStopOpen(map, 2), false, "finding the secret never opens campaign trails");
+  assert.equal(chooseTrail(map, SECRET_INDEX), SECRET_INDEX);
+  moveSelection(map, "End");
+  assert.equal(map.selected, SECRET_INDEX);
+  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { secret: true }).selected, SECRET_INDEX, "replaying it reopens the map on its stop");
+  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX).selected, 1, "a hidden secret falls back to the furthest open trail");
+  assert.equal(trailPath(TOTAL + 1).stops.length, TOTAL + 1);
 });

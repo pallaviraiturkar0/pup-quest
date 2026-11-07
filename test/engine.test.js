@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGame, intersects, nextLevel, pauseGame, PHYSICS, restartGame, resumeGame, startGame, stepGame } from "../src/engine.js";
-import { GROUND_Y, LEVELS, VIEW_HEIGHT, VIEW_WIDTH } from "../src/levels.js";
+import { createGame, ICE, iceUnder, intersects, nextLevel, pauseGame, PHYSICS, restartGame, resumeGame, startGame, stepGame } from "../src/engine.js";
+import { GROUND_Y, LEVELS, SECRET_INDEX, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "../src/levels.js";
 
 const tick = (game, input = {}) => stepGame(game, input, 1 / 120);
 function playing() {
@@ -235,7 +235,7 @@ test("every trail leads to victory without overflowing the level array", () => {
 });
 
 test("every spawn, checkpoint, and exit has safe ground, and gaps are jumpable", () => {
-  for (const level of LEVELS) {
+  for (const level of TRAILS) {
     for (const x of [level.start.x, level.checkpoint.x + 12, level.exit.x + 8]) {
       const puppy = { x, y: GROUND_Y - 18, w: 14, h: 18 };
       assert.ok(level.ground.some((ground) => x >= ground.x && x + 14 <= ground.x + ground.w), `${level.name}: unsupported spawn or exit at ${x}`);
@@ -246,4 +246,81 @@ test("every spawn, checkpoint, and exit has safe ground, and gaps are jumpable",
     assert.ok(level.gaps.every((gap) => gap.w < jumpDistance - 16));
     assert.ok(level.width > VIEW_WIDTH);
   }
+});
+
+// Puts the pup at rest on the secret trail's first ground ice patch, or just before it on grippy snow.
+function onFjord(onIce) {
+  const game = createGame(SECRET_INDEX);
+  startGame(game);
+  const span = game.level.ice[0];
+  place(game, onIce ? span.x + 8 : span.x - 40, GROUND_Y - game.player.h);
+  tick(game);
+  assert.equal(game.player.grounded, true);
+  assert.equal(game.player.onIce, onIce);
+  game.events.length = 0;
+  return game;
+}
+
+test("ice keeps top speed but speeds up and stops more slowly than snow", () => {
+  const run = (game, frames, input) => { for (let i = 0; i < frames; i += 1) tick(game, input); };
+  const snow = onFjord(false);
+  const ice = onFjord(true);
+  run(snow, 6, { right: true });
+  run(ice, 6, { right: true });
+  assert.ok(Math.abs(snow.player.vx - PHYSICS.acceleration * 6 / 120) < 1e-6);
+  assert.ok(Math.abs(ice.player.vx - PHYSICS.acceleration * ICE.traction * 6 / 120) < 1e-6, "ice cuts acceleration");
+  // Starting at full speed, measure how far each surface lets the pup coast after letting go.
+  const slide = (game) => {
+    game.player.vx = PHYSICS.speed;
+    const from = game.player.x;
+    run(game, 120, {});
+    assert.equal(game.player.vx, 0, "the pup always comes to a stop");
+    return game.player.x - from;
+  };
+  const snowSlide = slide(onFjord(false));
+  const iceSlide = slide(onFjord(true));
+  assert.ok(iceSlide > snowSlide * 3, `ice slide ${iceSlide} vs snow ${snowSlide}`);
+  assert.ok(iceSlide < 32, `a full-speed slide stays modest (${iceSlide.toFixed(1)}px)`);
+  const top = onFjord(true);
+  run(top, 120, { right: true });
+  assert.equal(top.player.vx, PHYSICS.speed, "top speed is unchanged on ice");
+});
+
+test("ice only affects grip on the ground, never in the air or on ordinary trails", () => {
+  const game = onFjord(true);
+  Object.assign(game.player, { vy: -PHYSICS.jump, y: game.player.y - 30, grounded: false });
+  tick(game, { right: true });
+  assert.equal(game.player.onIce, false);
+  assert.ok(Math.abs(game.player.vx - PHYSICS.acceleration / 120) < 1e-6, "full air control");
+  const level = game.level;
+  const icy = level.platforms.find((platform) => platform.ice);
+  const grippy = level.platforms.find((platform) => !platform.ice);
+  const centredAt = (x) => ({ x: x - 7, w: 14 });
+  assert.equal(iceUnder(level, icy, centredAt(icy.x + icy.w / 2)), true, "the middle of an icy ledge is slippery");
+  assert.equal(iceUnder(level, icy, centredAt(icy.x + 4)), false, "its left edge is grippy");
+  assert.equal(iceUnder(level, icy, centredAt(icy.x + icy.w - 4)), false, "its right edge is grippy");
+  assert.equal(iceUnder(level, grippy, { x: grippy.x, w: 14 }), false);
+  const ground = level.ground.find((block) => block.x <= level.ice[0].x && block.x + block.w >= level.ice[0].x + level.ice[0].w);
+  assert.equal(iceUnder(level, ground, { x: level.ice[0].x - 7 + 1, w: 14 }), true, "feet over the ice");
+  assert.equal(iceUnder(level, ground, { x: level.ice[0].x - 7 - 1, w: 14 }), false, "feet still on snow");
+  for (const trail of LEVELS) {
+    const meadow = createGame(TRAILS.indexOf(trail));
+    startGame(meadow);
+    tick(meadow);
+    assert.equal(meadow.player.onIce, false, trail.name);
+  }
+});
+
+test("clearing the secret trail ends the run without wrapping into the campaign", () => {
+  const game = createGame(SECRET_INDEX);
+  assert.equal(game.levelIndex, SECRET_INDEX);
+  assert.equal(game.level.name, TRAILS[SECRET_INDEX].name);
+  startGame(game);
+  finish(game);
+  assert.equal(game.status, "won");
+  nextLevel(game);
+  assert.equal(game.levelIndex, SECRET_INDEX, "there is no trail after the secret one");
+  restartGame(game);
+  assert.equal(game.levelIndex, SECRET_INDEX, "trying again replays the secret trail");
+  assert.equal(createGame(TRAILS.length).levelIndex, 0);
 });

@@ -308,6 +308,50 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
         rect(x + 6, 197 - h, 12, 2, highlight);
       }
     },
+    aurora(layer, game, time, theme, reducedMotion) {
+      const scroll = game.cameraX * layer.parallax;
+      layer.colors.forEach((value, band) => {
+        const color = resolveColor(theme, value);
+        for (let x = 0; x < VIEW_WIDTH; x += 3) {
+          const phase = (x + scroll) * 0.018 + band * 1.7 + time * 0.35;
+          const y = layer.top + band * 9 + Math.sin(phase) * 8 + Math.sin(phase * 0.37 + time * 0.2) * 5;
+          const h = layer.height * (0.45 + 0.55 * Math.abs(Math.sin(phase * 0.6 + band)));
+          ctx.globalAlpha = reducedMotion ? 0.1 : 0.08 + Math.abs(Math.sin(phase * 0.5 + time * 0.8)) * 0.08;
+          rect(x, y, 3, h, color);
+          ctx.globalAlpha = 0.3;
+          rect(x, y, 3, 2, color);
+        }
+      });
+      ctx.globalAlpha = 1;
+    },
+    glaciers(layer, game, time, theme) {
+      const { spacing } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      const body = resolveColor(theme, layer.color);
+      const cap = resolveColor(theme, layer.highlight);
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        const index = i + Math.floor(scroll / spacing) + (layer.seed ?? 0);
+        const x = Math.round(i * spacing - (scroll % spacing) + noise(index + 170) * 24);
+        const peak = layer.top + noise(index + 171) * 30;
+        const w = spacing * (0.55 + noise(index + 172) * 0.3);
+        polygon([[x - w, 224], [x - w * 0.35, peak + 22], [x - 6, peak + 6], [x, peak], [x + w * 0.3, peak + 18], [x + w, 224]], body);
+        const capH = (layer.base - peak) * 0.3;
+        polygon([[x, peak], [x - w * 0.3, peak + capH], [x - w * 0.14, peak + capH * 0.75], [x - 2, peak + capH * 1.05], [x + w * 0.1, peak + capH * 0.7], [x + w * 0.24, peak + capH * 0.9], [x + w * 0.2, peak + 14]], cap);
+      }
+    },
+    snow(layer, game, time, theme) {
+      const color = resolveColor(theme, layer.color);
+      const scroll = game.cameraX * layer.parallax;
+      for (let i = 0; i < layer.count; i += 1) {
+        const fall = 10 + noise(i + 401) * 16;
+        const x = wrap(noise(i + 400) * 560 - scroll + Math.sin(time * 0.9 + i) * 6, 560) - 40;
+        const y = wrap(noise(i + 402) * 240 + time * fall, 240) - 12;
+        const size = i % 5 === 0 ? 2 : 1;
+        ctx.globalAlpha = 0.55 + noise(i + 403) * 0.45;
+        rect(x, y, size, size, color);
+      }
+      ctx.globalAlpha = 1;
+    },
     lamps(layer, game, time, theme) {
       const { spacing } = layer;
       const scroll = game.cameraX * layer.parallax;
@@ -364,6 +408,41 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     }
   }
 
+  // A glossy sheet of ice over a slippery stretch, with glints and (on ledges) little icicles.
+  function iceSheet(x, y, w, floating, camera) {
+    if (x > camera + VIEW_WIDTH || x + w < camera) return;
+    rect(x, y - 1, w, 5, "#b9e1f2");
+    rect(x, y - 1, w, 1, "#effaff");
+    rect(x, y + 3, w, 1, "#8cc3dc");
+    const first = Math.max(x, Math.floor(camera / 16) * 16);
+    for (let tx = first; tx < Math.min(x + w, camera + VIEW_WIDTH + 16); tx += 16) {
+      rect(tx + 3, y, 5, 1, "#ffffff");
+      rect(tx + 11, y + 2, 2, 1, "#ffffff");
+      if (floating) {
+        rect(tx + 4, y + 14, 2, 3, "#b9e1f2");
+        rect(tx + 12, y + 14, 1, 2, "#b9e1f2");
+      }
+    }
+  }
+
+  function snowman(x, palette) {
+    rect(x - 8, GROUND_Y - 12, 17, 12, palette.grassLight);
+    rect(x - 6, GROUND_Y - 14, 13, 2, palette.grassLight);
+    rect(x - 5, GROUND_Y - 23, 11, 10, palette.grassLight);
+    rect(x - 8, GROUND_Y - 3, 17, 3, palette.grassDark);
+    rect(x - 2, GROUND_Y - 20, 1, 2, "#2e3440");
+    rect(x + 2, GROUND_Y - 20, 1, 2, "#2e3440");
+    rect(x + 1, GROUND_Y - 17, 4, 1, "#e98a4a");
+    rect(x - 6, GROUND_Y - 14, 13, 2, "#d0596b");
+    rect(x + 3, GROUND_Y - 13, 3, 4, "#d0596b");
+    rect(x - 5, GROUND_Y - 26, 11, 3, "#3b3f52");
+    rect(x - 3, GROUND_Y - 30, 7, 4, "#3b3f52");
+    rect(x, GROUND_Y - 9, 1, 1, "#2e3440");
+    rect(x, GROUND_Y - 6, 1, 1, "#2e3440");
+    rect(x - 13, GROUND_Y - 13, 5, 1, palette.trunk);
+    rect(x + 9, GROUND_Y - 14, 5, 1, palette.trunk);
+  }
+
   function flower(x, y, palette, seed) {
     const height = 4 + Math.floor(noise(seed) * 3);
     rect(x, y - height, 1, height, palette.grassDark);
@@ -415,10 +494,15 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     for (let x = from; x < cameraX + VIEW_WIDTH + 24; x += 24) {
       if (!level.ground.some((ground) => x > ground.x + 4 && x < ground.x + ground.w - 6)) continue;
       const seed = Math.floor(x / 24);
-      if (noise(seed) > 0.3) flower(x + 4, GROUND_Y - 1, palette, seed);
+      if (decor.flowers !== false && noise(seed) > 0.3) flower(x + 4, GROUND_Y - 1, palette, seed);
       if (noise(seed + 8) > 0.88) {
         if (decor.scatter === "mushroom") mushroom(x + 12, GROUND_Y, palette);
         else if (decor.scatter === "shell") shell(x + 13, GROUND_Y);
+        else if (decor.scatter === "snowdrift") {
+          rect(x + 8, GROUND_Y - 3, 14, 3, palette.grassLight);
+          rect(x + 11, GROUND_Y - 5, 7, 2, palette.grassLight);
+          rect(x + 9, GROUND_Y - 1, 12, 1, palette.grassDark);
+        }
         else {
           rect(x + 10, GROUND_Y - 4, 8, 3, palette.stone);
           rect(x + 12, GROUND_Y - 6, 4, 3, palette.stone);
@@ -432,6 +516,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       else if (decor.landmark === "palm") palm(x, GROUND_Y, 0.6, palette);
       else if (decor.landmark === "bench") bench(x, palette);
       else if (decor.landmark === "hydrant") hydrant(x);
+      else if (decor.landmark === "snowman") snowman(x, palette);
       else if (decor.landmark === "stump") {
         rect(x - 8, GROUND_Y - 13, 18, 12, palette.trunk);
         rect(x - 10, GROUND_Y - 15, 22, 5, palette.dirtLight);
@@ -795,6 +880,8 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     decorations(game, theme);
     for (const ground of game.level.ground) terrain(ground, palette, false, game.cameraX);
     for (const platform of game.level.platforms) terrain(platform, palette, true, game.cameraX);
+    for (const span of game.level.ice ?? []) iceSheet(span.x, GROUND_Y, span.w, false, game.cameraX);
+    for (const { ice, y } of game.level.platforms) if (ice) iceSheet(ice.x, y, ice.w, true, game.cameraX);
     for (const spike of game.level.spikes) {
       for (let x = spike.x; x < spike.x + spike.w; x += 7) {
         rect(x, spike.y + 5, 6, 3, "#748273");

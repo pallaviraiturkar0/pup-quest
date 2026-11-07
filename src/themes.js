@@ -11,9 +11,9 @@ export const PALETTE_KEYS = [
   "dirtDark", "stone", "water", "waterLight", "flower",
 ];
 
-export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps"];
-export const SCATTER_KINDS = ["rock", "mushroom", "shell"];
-export const LANDMARK_KINDS = ["tree", "stump", "pillar", "palm", "bench", "hydrant"];
+export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps", "aurora", "glaciers", "snow"];
+export const SCATTER_KINDS = ["rock", "mushroom", "shell", "snowdrift"];
+export const LANDMARK_KINDS = ["tree", "stump", "pillar", "palm", "bench", "hydrant", "snowman"];
 
 const DAY_SUN = { kind: "sun", parallax: 0.025, color: "#f5e8aa", halo: "#dce5c2" };
 const NIGHT_MOON = { kind: "moon", parallax: 0.025, color: "#ede9c8", halo: "#626687", shadow: "#68718d", crater: "#d2d4b6" };
@@ -135,6 +135,26 @@ export const THEMES = {
       { kind: "trees", parallax: 0.3, style: "pine" },
     ],
     decor: { scatter: "rock", landmark: "pillar" },
+  },
+  arctic: {
+    label: "Frosty fjord",
+    palette: {
+      sky: "#1d2a4f", horizon: "#56709a", cloud: "#8193b5", cloudShade: "#62759b",
+      far: "#7189b0", hill: "#a9bfd8", treeBack: "#3c5d6c", tree: "#2e5560",
+      treeLight: "#e3eef3", trunk: "#5b5262", grass: "#e6eff4", grassLight: "#ffffff",
+      grassDark: "#a9bfd1", dirt: "#7a8ea8", dirtLight: "#93a6bd", dirtDark: "#62758f",
+      stone: "#c6d4e1", water: "#356790", waterLight: "#a7d3ea", flower: "#f2f7fb",
+    },
+    layers: [
+      { ...STARS, count: 36, color: "#eef4ff" },
+      // Northern lights: soft ribbons that ripple slowly across the twilight sky.
+      { kind: "aurora", parallax: 0.03, colors: ["#6ff0bf", "#79c9ff", "#b79bff"], top: 26, height: 30 },
+      { kind: "glaciers", parallax: 0.08, color: "far", highlight: "#c9d9ee", spacing: 150, top: 104, base: 200 },
+      { kind: "glaciers", parallax: 0.16, color: "hill", highlight: "#eef5fc", spacing: 112, top: 138, base: 200, seed: 40 },
+      { kind: "trees", parallax: 0.3, style: "pine" },
+      { kind: "snow", parallax: 0.45, count: 70, color: "#f5f9ff" },
+    ],
+    decor: { scatter: "snowdrift", landmark: "snowman", flowers: false },
   },
 };
 

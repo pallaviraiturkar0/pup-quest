@@ -7,7 +7,7 @@ export const VIEW_WIDTH = 480;
 export const VIEW_HEIGHT = 256;
 export const GROUND_Y = 208;
 
-function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null }) {
+function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null, ice = [], secret = false }) {
   if (!Array.isArray(par) || par.length !== 3 || !par.every((seconds, index) => Number.isFinite(seconds) && seconds > (par[index - 1] ?? 0))) {
     throw new Error(`${name}: par must be [gold, silver, bronze] seconds in increasing order`);
   }
@@ -26,7 +26,13 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     start: { x: 48, y: GROUND_Y - 18 },
     ground,
     gaps: gaps.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
-    platforms: platforms.map(([x, y, w]) => ({ x: x * TILE, y: y * TILE, w: w * TILE, h: TILE })),
+    // A fourth "ice" entry glazes a platform, leaving one grippy tile at each end so the pup never slides off an edge.
+    platforms: platforms.map(([x, y, w, surface]) => ({
+      x: x * TILE, y: y * TILE, w: w * TILE, h: TILE,
+      ice: surface === "ice" ? { x: (x + 1) * TILE, w: (w - 2) * TILE } : null,
+    })),
+    // [column, width] stretches of slippery ice on the ground.
+    ice: ice.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
     treats: treats.map(([x, y]) => ({ x: x * TILE + 8, y, collected: false })),
     // [type, column, y] tuples, centred in their column like treats.
     powerups: powerups.map(([type, x, y]) => makePowerup(type, x * TILE + 8, y)),
@@ -46,6 +52,7 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     }),
     exit: { x: (columns - 6) * TILE, y: GROUND_Y - 32, w: 32, h: 32 },
     // A boss guards an arena between two columns and drops the golden key when beaten.
+    secret,
     boss: boss && makeBoss({ x: boss.x * TILE, left: boss.left * TILE, right: boss.right * TILE, floor: GROUND_Y }),
   };
 }
@@ -154,3 +161,34 @@ export const LEVELS = [
     boss: { x: 160, left: 151, right: 173 },
   }),
 ];
+
+// A secret bonus trail, outside the main campaign. It opens once the player beats the Mega-Vac
+// or earns a gold paw on any trail (see `secretTrailOpen` in trailmap.js).
+export const SECRET_TRAIL = trail({
+  name: "Frosty Fjord", theme: "arctic", columns: 140, par: [32, 44, 66], secret: true,
+  gaps: [[22, 3], [40, 3], [58, 4], [78, 3], [96, 4], [116, 3]],
+  platforms: [
+    [9, 11, 3], [15, 9, 3, "ice"], [21, 11, 5], [29, 9, 4, "ice"], [35, 11, 3], [39, 11, 5], [46, 9, 3],
+    [51, 7, 4, "ice"], [57, 11, 6], [66, 9, 3, "ice"], [71, 7, 3], [77, 11, 5], [85, 9, 4, "ice"], [91, 7, 3],
+    [95, 11, 6], [104, 9, 3], [109, 7, 4, "ice"], [115, 11, 5], [124, 10, 3],
+  ],
+  ice: [[12, 6], [27, 5], [64, 8], [102, 6], [121, 5]],
+  treats: [
+    [6, 188], [10, 164], [13, 188], [16, 132], [17, 132], [22, 164], [24, 164], [30, 132], [32, 132], [36, 164],
+    [40, 164], [42, 164], [47, 132], [52, 100], [54, 100], [58, 164], [61, 164], [67, 132], [68, 132], [72, 100],
+    [79, 164], [86, 132], [88, 132], [92, 100], [97, 164], [99, 164], [105, 132], [116, 164], [118, 164], [125, 148],
+    [131, 188],
+  ],
+  powerups: [["bone", 53, 100], ["squeaky", 70, 188], ["zoomies", 98, 156]],
+  key: [111, 94], checkpoint: 82,
+  spikes: [[34, 1], [48, 2], [74, 1], [93, 1], [128, 1]],
+  enemies: [
+    [52, 50, 55, 22], [87, 86, 89, 24], [112, 111, 114, 24],
+    { type: "seagull", x: 59, left: 58, right: 64, speed: 24 },
+    { type: "seagull", x: 97, left: 96, right: 103, speed: 26, phase: 1.3 },
+  ],
+});
+
+// Every playable trail: the campaign, then the secret trail at index `SECRET_INDEX`.
+export const SECRET_INDEX = LEVELS.length;
+export const TRAILS = [...LEVELS, SECRET_TRAIL];

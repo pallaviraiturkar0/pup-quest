@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGame, nextLevel, PHYSICS, startGame, stepGame } from "../src/engine.js";
+import { createGame, ICE, nextLevel, PHYSICS, startGame, stepGame } from "../src/engine.js";
+import { SECRET_INDEX } from "../src/levels.js";
 import { BOSS } from "../src/boss.js";
 import { MAX_LIVES } from "../src/powerups.js";
 import { medalFor, runMs } from "../src/medals.js";
@@ -75,6 +76,17 @@ const ROUTES = [
   ],
 ];
 
+// Frosty Fjord, the secret trail, hops across icy ledges to the golden key on its highest one.
+const SECRET_ROUTE = [
+  [120, 208], [150, 176, true], [176, 176], [250, 144, true], [274, 144], [345, 176, true], [400, 176],
+  [470, 144, true], [514, 144], [570, 176, true], [594, 176], [640, 176, true], [690, 176], [745, 144, true],
+  // Short pauses at 930 and 1590 let the patrolling seagulls swoop past first.
+  [770, 144], [825, 112, true], [866, 112], [920, 176, true], [930, 176], [992, 176], [1060, 144, true], [1090, 144],
+  [1140, 112, true], [1170, 112], [1240, 176, true], [1298, 176], [1370, 144, true], [1410, 144],
+  [1460, 112, true], [1490, 112], [1530, 176, true], [1600, 176], [1590, 176], [1600, 176], [1670, 144, true], [1698, 144],
+  [1750, 112, true], [1790, 112], [1850, 176, true], [1940, 208], [1990, 160, true], [2080, 208, true], [2160, 208],
+];
+
 // Moonlit Keep ends in the Mega-Vac's arena: wait on the left wall ledge, let it
 // charge into the wall, drop onto its lid while it's dizzy, then hop back.
 const BOSS_FIGHT = {
@@ -106,12 +118,16 @@ function fightBoss(game) {
   for (const [x, floor, jump] of BOSS_FIGHT.home) travel(game, x, floor, jump);
 }
 
+// Returns how many frames the pup spent standing on ice along the way.
 function travel(game, x, floor, jump = false) {
   let airborne = false;
+  let iceFrames = 0;
   for (let frame = 0; frame < 1600; frame += 1) {
     const p = game.player;
     const distance = x - p.x;
-    const brakingDistance = p.vx * p.vx / (2 * PHYSICS.acceleration);
+    // On ice the pup needs a longer run-out to stop, so it eases off sooner.
+    const grip = p.grounded && p.onIce ? ICE.traction : 1;
+    const brakingDistance = p.vx * p.vx / (2 * PHYSICS.acceleration * grip);
     const direction = Math.abs(distance) > brakingDistance + 0.6 ? Math.sign(distance) : 0;
     stepGame(game, {
       left: direction < 0, right: direction > 0,
@@ -119,11 +135,12 @@ function travel(game, x, floor, jump = false) {
     }, 1 / 120);
     game.events.length = 0;
     airborne ||= !game.player.grounded;
+    if (game.player.onIce) iceFrames += 1;
     assert.equal(game.deaths, 0, `${game.level.name}: lost a life en route to ${x}/${floor}`);
-    if (game.status !== "playing") return;
+    if (game.status !== "playing") return iceFrames;
     if (Math.abs(game.player.x - x) < 2 && Math.abs(game.player.vx) < 10 &&
         game.player.grounded && Math.abs(game.player.y + game.player.h - floor) < 1 &&
-        (!jump || airborne)) return;
+        (!jump || airborne)) return iceFrames;
   }
   assert.fail(`${game.level.name}: cannot reach ${x}/${floor}; stopped at ${game.player.x.toFixed(1)}/${(game.player.y + game.player.h).toFixed(1)}`);
 }
@@ -148,4 +165,17 @@ test("a real-input playthrough beats the Mega-Vac, reaches every golden key, and
   // Bone treats along the route top the pup up to the heart cap.
   assert.equal(game.lives, MAX_LIVES);
   assert.ok(game.totalTreats > 0);
+});
+
+test("a real-input run of the secret icy trail finds the key and wins inside gold par without losing a heart", () => {
+  const game = createGame(SECRET_INDEX);
+  startGame(game);
+  stepGame(game);
+  let iceFrames = 0;
+  for (const [x, floor, jump] of SECRET_ROUTE) iceFrames += travel(game, x, floor, jump);
+  assert.ok(iceFrames >= 120, `the route really crosses the ice (${iceFrames} frames)`);
+  assert.equal(game.keyFound, true);
+  assert.equal(game.status, "won");
+  assert.equal(medalFor(runMs(game.levelTime), game.level.par), "gold", `${game.levelTime.toFixed(2)}s misses gold`);
+  assert.equal(game.deaths, 0);
 });

@@ -1,6 +1,7 @@
 // Trail Map: level-select logic kept free of the DOM so it can be tested in node.
 // Progress is stored as the number of unlocked trails (trail 01 is always open).
 
+import { medalFor } from "./medals.js";
 import { getTheme } from "./themes.js";
 
 export const UNLOCK_KEY = "unlocked";
@@ -25,9 +26,22 @@ export function isUnlocked(index, unlocked) {
   return Number.isInteger(index) && index >= 0 && index < unlocked;
 }
 
-export function createTrailMap(unlocked, total, preferred = unlocked - 1) {
-  const selected = Math.min(Math.max(preferred, 0), Math.max(unlocked - 1, 0));
-  return { unlocked, total, selected };
+// The secret trail opens once the finale is cleared (beating the boss records its time) or any
+// campaign trail earns a gold paw. It is derived from saved best times, so it never needs its own key.
+export function secretTrailOpen(bestTimes, levels) {
+  const finale = bestTimes?.[levels.length - 1];
+  if (Number.isSafeInteger(finale) && finale > 0) return true;
+  return levels.some((level, index) => medalFor(bestTimes?.[index], level.par) === "gold");
+}
+
+// `total` counts the campaign trails. With `secret`, one extra stop (index `total`) joins the map.
+export function createTrailMap(unlocked, total, preferred = unlocked - 1, { secret = false } = {}) {
+  const selected = secret && preferred === total ? total : Math.min(Math.max(preferred, 0), Math.max(unlocked - 1, 0));
+  return { unlocked, total: total + (secret ? 1 : 0), trails: total, secret, selected };
+}
+
+export function isStopOpen(map, index) {
+  return map.secret && index === map.trails ? true : isUnlocked(index, map.unlocked);
 }
 
 // Arrows walk every stop (locked ones too, so their padlock can be read out) and stop at the ends.
@@ -42,7 +56,7 @@ export function moveSelection(map, key) {
 
 // Returns the trail index to start, or null when the trail is still locked.
 export function chooseTrail(map, index = map.selected) {
-  return isUnlocked(index, map.unlocked) ? index : null;
+  return isStopOpen(map, index) ? index : null;
 }
 
 // A deterministic winding path: stops zig-zag between rows with a little seeded wobble,
