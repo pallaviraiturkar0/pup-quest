@@ -4,7 +4,7 @@
 
 **[Play Pup Quest](https://pallaviraiturkar0.github.io/pup-quest/)**
 
-Run, jump, collect treats, and find the golden key to open the doghouse. Explore seven handcrafted trails: Sunny Meadow, Mossy Hollow, Starlit Summit, Puppy Park, Seashell Shore, Neon Nightwalk, and the finale, Moonlit Keep, where a boss guards the last golden key. Skilled pups can also uncover a secret eighth trail, Frosty Fjord. Inspired by the approachable platforming of DOS-era games like Dangerous Dave, with entirely original code, levels, artwork, and synthesized sound effects.
+Run, jump, collect treats, and find the golden key to open the doghouse. Explore seven handcrafted trails: Sunny Meadow, Mossy Hollow, Starlit Summit, Puppy Park, Seashell Shore, Neon Nightwalk, and the finale, Moonlit Keep, where a boss guards the last golden key. Skilled pups can also uncover a secret eighth trail, Frosty Fjord, guarded by the Grumpy Yeti. Inspired by the approachable platforming of DOS-era games like Dangerous Dave, with entirely original code, levels, artwork, and synthesized sound effects.
 
 ## Controls
 
@@ -69,7 +69,19 @@ A hidden bonus trail appears on the Trail Map as a glowing ★ stop after you ei
 
 - Frosty Fjord is a single-trail challenge under an aurora with falling snow and icy parallax peaks. Clearing it shows its own victory screen, and **Slide again** replays it.
 - Glossy blue **ice** covers some ground patches and ledges. On ice Biscuit has 30% of his usual grip, so he speeds up and stops more slowly (a full-speed slide carries about a tile and a half). Top speed, jumping, and air control are unchanged, and icy ledges keep a grippy tile at each end, and ground ice is never placed next to a cliff edge, a spike, a critter's patrol, or a start, checkpoint, or exit.
-- It is timed like every trail, with its own par times and paw medal, saved as trail 8 in `pup-quest:best-times`.
+- It is timed like every trail, with its own par times and paw medal, saved under the key `8-yeti` in `pup-quest:best-times`. Times from before the Yeti arrived (saved as `8`) came from a shorter course, so they no longer count toward its medal.
+
+#### Secret boss: the Grumpy Yeti
+
+At the end of Frosty Fjord, past a checkpoint flag, a huge shaggy snow-dog with floppy ears and a red collar naps in an arena with a glossy **ice patch on each side** of it. It holds the golden key. It wakes when Biscuit steps in, and every attack has a tell:
+
+1. **Snowball**: an arm goes up and a snowball grows in its paw, then it's thrown at the spot where Biscuit stood when the Yeti started aiming. A shadow on the floor marks where it will land, so keep moving. A snowball that lands on snow bursts; one that lands on **ice keeps rolling** until it reaches snow, so hop over it.
+2. **Leap**: after its throws it crouches, shakes, and shows a **!**, and a blinking shadow marks its landing spot under Biscuit. Then it leaps. If it lands on snow, the floor quakes and a **shockwave** runs along the ground both ways (jump it). If it lands on **ice, it slips** and skids onto its back with dizzy stars.
+3. **Belly stomp**: hop on its pink belly while it's down. Jumping on it while it's standing just bounces you off.
+
+So the trick is to **stand on the ice when it crouches**, then run (carefully, with only 30% grip) before it lands. After any leap away from the middle it hops back home first, sending out another shockwave, so it can never pin Biscuit against a wall. Each stomp makes the next round a little quicker (and the third round throws three snowballs). Touching it while it's standing, a snowball, or a shockwave costs a heart; if that happens it returns home for a nap but keeps its bruises.
+
+After three belly stomps the Yeti rolls over for belly rubs, wagging its tail under a shower of hearts and confetti. The golden key appears in the middle of the arena, and the doghouse waits just past it. Its tells, snowballs, and shadows are all drawn procedurally; with **prefers-reduced-motion**, the shaking, blinking, and bobbing hold still and only a few still hearts appear.
 
 ### Time trials and paw medals
 
@@ -86,13 +98,13 @@ Clear a trail to see your run time, your best time, and a paw medal on the level
 | 05 Seashell Shore | 0:35 | 0:48 | 1:12 |
 | 06 Neon Nightwalk | 0:34 | 0:46 | 1:10 |
 | 07 Moonlit Keep | 0:48 | 1:06 | 1:40 |
-| ★ Frosty Fjord (secret) | 0:32 | 0:44 | 1:06 |
+| ★ Frosty Fjord (secret) | 1:06 | 1:28 | 2:10 |
 
 Gold is about 10% slower than the full-campaign input replay used in the tests (which checks that it earns gold on every trail), so it rewards a clean, confident run without needing frame-perfect play. Slower clears still count; they just don't earn a medal yet.
 
 The Trail Map shows each cleared trail's best time and a medal badge on its stop, and the selected stop's details appear under the map title. Screen readers hear run times, best times, and medals in words, both on the level-clear screen and on each map stop. Medals are drawn as inline pixel-art SVG, and with **prefers-reduced-motion** the New best! pop animation is turned off.
 
-Best times are saved per trail on your device under `pup-quest:best-times`. Unreadable or tampered entries are ignored. Saves re-read the stored times under a cross-tab [Web Lock](https://developer.mozilla.org/docs/Web/API/Web_Locks_API) (when the browser supports it), so if another tab saved a faster time, the faster time is kept.
+Best times are saved per trail on your device under `pup-quest:best-times`, keyed by trail number (a level can set its own `record` key when its course changes). Unreadable or tampered entries are ignored. Saves re-read the stored times under a cross-tab [Web Lock](https://developer.mozilla.org/docs/Web/API/Web_Locks_API) (when the browser supports it), so if another tab saved a faster time, the faster time is kept.
 
 ### Dog Kennel
 
@@ -142,14 +154,15 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 ## How it works
 
 - `src/engine.js`: deterministic game rules and fixed-step physics.
-- `src/levels.js`: seven handcrafted trails plus the secret Frosty Fjord (`TRAILS` lists all eight) and their collectible/platform layouts. A trail can add `boss: { x, left, right }` (in columns) to place a boss arena. Icy ground spans are `ice: [[column, width]]`, and a platform tuple can end with `"ice"`.
+- `src/levels.js`: seven handcrafted trails plus the secret Frosty Fjord (`TRAILS` lists all eight) and their collectible/platform layouts. A trail can add `boss: { x, left, right }` (in columns) to place a Mega-Vac arena, or `boss: { kind: "yeti", x, left, right }` for the Grumpy Yeti, which uses the trail's ground ice inside its arena. Icy ground spans are `ice: [[column, width]]`, and a platform tuple can end with `"ice"`.
 - `src/boss.js`: the Mega-Vac boss state machine, stomp rules, and arena reset.
+- `src/yeti.js`: the Grumpy Yeti boss state machine: snowballs (which roll on ice), leaps, shockwaves, slipping on ice, belly stomps, and arena reset.
 - `src/enemies.js`: data-driven critters (squirrels, robot vacuums, seagulls, alley cats) with their movement rules. Levels place them with objects such as `{ type: "cat", x, left, right, speed, row }`; plain `[x, left, right, speed]` tuples are ground squirrels.
 - `src/powerups.js`: bone treat, zoomies, and squeaky toy rules (pickup, effects, and timers). Levels place them as `[type, column, y]` tuples.
 - `src/themes.js`: data-driven backdrops (palette, parallax layers, and ground decor) picked by each level's `theme`.
 - `src/render.js`: original pixel artwork drawn at 480 x 256 and scaled without smoothing.
 - `src/audio.js`: procedural sound recipes (pure data) plus a small Web Audio adapter that handles gesture unlock, mute, and saved preference.
-- `src/particles.js`: capped, DOM-free particle pool with dust, sparkle, paw-print, and confetti bursts, and reduced-motion fallbacks.
+- `src/particles.js`: capped, DOM-free particle pool with dust, sparkle, paw-print, snow, heart, and confetti bursts, and reduced-motion fallbacks.
 - `src/medals.js`: DOM-free time-trial logic: medals from par times, best-time storage and merging, time formatting, and the medal art.
 - `src/trailmap.js`: DOM-free Trail Map logic: reading and advancing unlock progress, keyboard selection, locked-trail rules, the secret-trail unlock, the seeded winding path, and per-theme stop colours.
 - `src/kennel.js`: DOM-free Dog Kennel logic: pup skin data, medal-based unlock rules, saved-skin fallback, and the shared procedural pup sprite used by gameplay and the Kennel previews.

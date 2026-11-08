@@ -9,6 +9,8 @@ const SPARKLE = ["#fff8d6", "#ffedb2", "#eec571"];
 const CONFETTI = ["#ef6f6c", "#f6c453", "#79c68f", "#6fb3e8", "#c58be6", "#fff4ca"];
 const PAWS = ["#fff4ca", "#f3d39c"];
 const HURT = ["#d99778", "#f0b58f"];
+const SNOW = ["#ffffff", "#e6eff4", "#b9e1f2"];
+const HEARTS = ["#ef6f6c", "#f29bb2"];
 
 // Each burst describes how many particles to spawn and how they move.
 // `still` bursts are the reduced-motion fallback: a few motionless sparkles.
@@ -19,6 +21,8 @@ export const BURSTS = Object.freeze({
   stomp: { count: 8, shape: "paw", colors: PAWS, spreadX: 80, liftMin: 30, liftMax: 70, life: [0.45, 0.7], size: [1, 1], gravity: GRAVITY, reduced: 0 },
   hurt: { count: 9, shape: "square", colors: HURT, spreadX: 65, liftMin: 12, liftMax: 67, life: [0.5, 0.8], size: [1, 2], gravity: GRAVITY, reduced: 0 },
   confetti: { count: 60, shape: "confetti", colors: CONFETTI, spreadX: 220, liftMin: 70, liftMax: 170, life: [1.2, 2], size: [2, 3], gravity: 140, reduced: 0 },
+  snow: { count: 10, shape: "square", colors: SNOW, spreadX: 70, liftMin: 10, liftMax: 50, life: [0.35, 0.6], size: [1, 3], gravity: GRAVITY, reduced: 0 },
+  hearts: { count: 12, shape: "heart", colors: HEARTS, spreadX: 90, liftMin: 30, liftMax: 80, life: [1, 1.6], size: [1, 1], gravity: 30, reduced: 3 },
   paws: { count: 14, shape: "paw", colors: PAWS, spreadX: 150, liftMin: 50, liftMax: 120, life: [1, 1.6], size: [1, 1], gravity: 90, reduced: 0 },
 });
 
@@ -38,6 +42,11 @@ export const EVENT_BURSTS = Object.freeze({
   "boss-bonk": ["dust"],
   "boss-hit": ["stomp", "big-sparkle"],
   "boss-defeated": ["confetti", "big-sparkle"],
+  "yeti-quake": ["snow", "dust"],
+  "yeti-slip": ["snow"],
+  "snowball-splat": ["snow"],
+  "yeti-hit": ["stomp", "snow", "big-sparkle"],
+  "yeti-befriended": ["confetti", "hearts", "big-sparkle"],
 });
 
 function blank() {
@@ -126,5 +135,6 @@ export function particleAlpha(particle) {
 // Small pixel masks used by the renderer, as [x, y] offsets.
 export const SHAPE_PIXELS = Object.freeze({
   sparkle: [[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]],
+  heart: [[-1, -1], [1, -1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]],
   paw: [[-1, -2], [1, -2], [-2, -1], [2, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]],
 });

@@ -188,7 +188,7 @@ test("Frosty Fjord is a secret arctic trail kept outside the campaign", () => {
   assert.equal(TRAILS[SECRET_INDEX], SECRET_TRAIL);
   assert.ok(LEVELS.every((level) => !level.secret && level.ice.length === 0 && level.platforms.every((platform) => !platform.ice)),
     "campaign trails keep their grip");
-  assert.equal(SECRET_TRAIL.boss, null);
+  assert.equal(SECRET_TRAIL.boss?.kind, "yeti", "the Grumpy Yeti guards its key");
   assert.ok(!TRAILS.slice(0, -1).some((level) => level.name === SECRET_TRAIL.name));
 });
 

@@ -39,6 +39,18 @@ export const SOUND_RECIPES = Object.freeze({
   "boss-bonk": [voice("triangle", 880, 620, 0, 0.08, 0.04)],
   "boss-hit": [voice("square", 220, 90, 0, 0.16, 0.05), ...bark(0.06, 1.1), voice("triangle", 1046, 1318, 0.18, 0.1, 0.04)],
   "boss-defeated": [voice("sawtooth", 440, 50, 0, 0.9, 0.04), ...notes("square", [784, 988, 1175, 1568], 0.08, 0.03).map((part) => ({ ...part, at: part.at + 0.6 })), ...bark(1, 1.2, 0.06)],
+  // The Grumpy Yeti growls, whooshes snowballs, thuds the ice, slips with a slide whistle,
+  // and turns friendly with a deep, happy "WOOF".
+  "yeti-wake": [voice("sawtooth", 110, 70, 0, 0.5, 0.04), voice("noise", 1, 1, 0.05, 0.4, 0.02)],
+  "yeti-aim": [voice("sawtooth", 90, 130, 0, 0.25, 0.03)],
+  "yeti-throw": [voice("noise", 1, 1, 0, 0.14, 0.03), voice("sine", 500, 260, 0, 0.14, 0.03)],
+  "yeti-crouch": [voice("square", 330, 330, 0, 0.1, 0.03), voice("square", 247, 247, 0.14, 0.12, 0.03)],
+  "yeti-return": [voice("square", 247, 247, 0, 0.1, 0.03), voice("square", 330, 330, 0.14, 0.12, 0.03)],
+  "yeti-quake": [voice("sine", 90, 30, 0, 0.35, 0.08), voice("noise", 1, 1, 0, 0.25, 0.04)],
+  "yeti-slip": [voice("triangle", 1100, 220, 0, 0.45, 0.05), voice("noise", 1, 1, 0.4, 0.12, 0.04)],
+  "snowball-splat": [voice("noise", 1, 1, 0, 0.08, 0.03)],
+  "yeti-hit": [voice("sine", 200, 80, 0, 0.14, 0.06), ...bark(0.06, 1.1), voice("triangle", 1046, 1318, 0.18, 0.1, 0.04)],
+  "yeti-befriended": [...bark(0, 0.55, 0.08), ...notes("square", [523, 659, 784, 1046, 1318], 0.08, 0.03).map((part) => ({ ...part, at: part.at + 0.2 })), ...bark(0.7, 1.2, 0.06)],
 });
 
 export function soundRecipe(type) {

@@ -5,7 +5,7 @@ import { createRenderer } from "./render.js";
 import { themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
 import {
-  BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_LABELS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes, recordBestTime,
+  BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_LABELS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes, recordBestTime, recordKeys,
   runMs, spokenTime, withSaveLock,
 } from "./medals.js";
 import {
@@ -77,7 +77,8 @@ if (!Number.isSafeInteger(bestScore) || bestScore < 0) {
 }
 let unlockedTrails = parseUnlocked(savedPreference(UNLOCK_KEY), LEVELS.length);
 let trailMap = null;
-let bestTimes = parseBestTimes(savedPreference(BEST_TIMES_KEY), TRAILS.length);
+const RECORD_KEYS = recordKeys(TRAILS);
+let bestTimes = parseBestTimes(savedPreference(BEST_TIMES_KEY), RECORD_KEYS);
 let shownTimer = "";
 let kennel = null;
 let skinId = DEFAULT_SKIN;
@@ -145,6 +146,7 @@ function objective() {
   if (game.keyFound) return "KEY FOUND · FIND YOUR WAY HOME";
   const { boss } = game.level;
   if (boss && !bossDefeated(boss)) {
+    if (boss.kind === "yeti") return boss.mode === "sleep" ? "THE GRUMPY YETI GUARDS THE GOLDEN KEY" : "LURE THE YETI ONTO THE ICE, THEN STOMP ITS BELLY";
     return boss.mode === "sleep" ? "THE MEGA-VAC GUARDS THE GOLDEN KEY" : "STOMP THE MEGA-VAC WHILE IT'S DIZZY";
   }
   return "FIND THE GOLDEN KEY. FOLLOW YOUR PAWS.";
@@ -193,7 +195,7 @@ function syncOverlay() {
       : ["ONE TRAIL CLOSER TO HOME", "Look at you go!", `${game.level.name}, conquered. A fresh trail and a little extra heart are waiting.`, "Next trail"],
     "game-over": ["EVERY ADVENTURE TAKES PRACTICE", "A little tumble.", "Even the best dogs miss a jump. Shake it off, wag that tail, and give it another go.", "Try again"],
     won: secret
-      ? ["SECRET TRAIL CONQUERED", "Brrr-avo, good dog!", `${game.level.name}, conquered! Not a paw put wrong on the ice. Race it again to chase a shinier paw medal.`, "Slide again"]
+      ? ["SECRET TRAIL CONQUERED", "Brrr-avo, good dog!", `${game.level.name}, conquered! The Grumpy Yeti just needed a belly rub, and now it's your fluffiest friend. Race it again to chase a shinier paw medal.`, "Slide again"]
       : ["CHAMPION OF MOONLIT KEEP", "Victory, very good dog!", "The Mega-Vac is out of power and the golden key is home. Seven trails, a pocket full of treats, and the comfiest nap in the kingdom. Well done, Biscuit.", "Play again"],
   };
   const [kicker, title, description, action] = screens[game.status];
@@ -268,12 +270,18 @@ function processEvents() {
     if (event.type === "key") toast("Golden key found! The doghouse is open.");
     if (event.type === "powerup") toast(POWERUP_MESSAGES[event.powerup](event));
     if (event.type === "checkpoint") toast("Checkpoint! A safe spot for little paws.");
-    if (event.type === "need-key") toast(game.level.boss && !bossDefeated(game.level.boss) ? "The door is locked. Beat the Mega-Vac to win the golden key!" : "The door is locked. Find the golden key first!");
+    if (event.type === "need-key") toast(game.level.boss && !bossDefeated(game.level.boss) ? `The door is locked. ${game.level.boss.kind === "yeti" ? "Befriend the Grumpy Yeti" : "Beat the Mega-Vac"} to win the golden key!` : "The door is locked. Find the golden key first!");
     if (event.type === "boss-wake") toast("The Mega-Vac whirs awake! Dodge its charge from a ledge, then stomp its lid while it's dizzy.");
     if (event.type === "boss-crash") toast("CRASH! It's dizzy. Stomp the lid!");
-    if (event.type === "boss-bonk") toast("Clang! Its lid only dents while it's dizzy.");
+    if (event.type === "boss-bonk") toast(game.level.boss?.kind === "yeti" ? "Boing! Trip it up on the ice first." : "Clang! Its lid only dents while it's dizzy.");
     if (event.type === "boss-hit") toast(`BONK! ${event.health} more ${event.health === 1 ? "stomp" : "stomps"}!`);
     if (event.type === "boss-defeated") toast("The Mega-Vac powers down! It dropped the golden key.");
+    if (event.type === "yeti-wake") toast("The Grumpy Yeti wakes up! Dodge its snowballs, stand on the ice when it crouches, then run before it lands.");
+    if (event.type === "yeti-return") toast("It's hopping back to the middle. Jump the shockwaves!");
+    if (event.type === "yeti-slip") toast("WHOOPS! It slipped on the ice. Stomp its belly!");
+    if (event.type === "yeti-quake" && game.level.boss.x !== game.level.boss.home) toast("THUD! It landed on snow. Lure it onto the ice instead.");
+    if (event.type === "yeti-hit") toast(`Belly bop! ${event.health} more ${event.health === 1 ? "stomp" : "stomps"}!`);
+    if (event.type === "yeti-befriended") toast("The Yeti rolls over for belly rubs. It's a friend now! It dropped the golden key.");
     if (event.type === "hurt" && game.lives > 0) toast(`Whoops! ${game.lives} ${game.lives === 1 ? "heart" : "hearts"} left. You've got this.`);
     if (event.type === "start") {
       $("toast").hidden = true;
@@ -311,7 +319,7 @@ function latestUnlocked() {
 }
 
 function latestBestTimes() {
-  bestTimes = mergeBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), TRAILS.length);
+  bestTimes = mergeBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), RECORD_KEYS);
   return bestTimes;
 }
 
@@ -337,7 +345,7 @@ function recordClear(index) {
 // Re-read and merge under a cross-tab lock so two tabs saving at once can't drop each other's records.
 function saveBestTimes() {
   withSaveLock(navigator.locks, `pup-quest:${BEST_TIMES_KEY}`, () => {
-    const commit = commitBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), TRAILS.length);
+    const commit = commitBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), RECORD_KEYS);
     bestTimes = commit.times;
     savedPreference(BEST_TIMES_KEY, commit.raw);
   }).catch((error) => console.warn("Pup Quest could not save a best time:", error));

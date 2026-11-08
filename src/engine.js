@@ -1,6 +1,7 @@
 import { BOSS, bossDangerous, bossDefeated, resetBoss, stompBoss, updateBoss } from "./boss.js";
 import { updateEnemy } from "./enemies.js";
 import { GROUND_Y, LEVELS, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
+import { resetYeti, stompYeti, updateYeti, YETI, yetiDangerous, yetiHazardHits } from "./yeti.js";
 import { applyPowerup, isScared, PICKUP_RADIUS, speedMultiplier, tickPlayerPowerups, tickScared } from "./powerups.js";
 
 export const PHYSICS = Object.freeze({
@@ -81,6 +82,24 @@ export function resumeGame(game) {
   if (game.status === "paused") game.status = "playing";
 }
 
+// How each boss kind moves, takes stomps and hurts the pup.
+const BOSS_RULES = {
+  megavac: {
+    config: BOSS,
+    update(boss, dt, player, emit) {
+      const cue = updateBoss(boss, dt, player);
+      if (cue) emit(cue);
+    },
+    stomp: stompBoss, dangerous: bossDangerous, reset: resetBoss, hazard: () => false,
+  },
+  yeti: {
+    config: YETI,
+    update: updateYeti, stomp: stompYeti, dangerous: yetiDangerous, reset: resetYeti, hazard: yetiHazardHits,
+  },
+};
+
+const bossRules = (boss) => BOSS_RULES[boss.kind] ?? BOSS_RULES.megavac;
+
 function loseLife(game, reason) {
   const { player, level } = game;
   if (player.invincible > 0 && reason !== "fall") return false;
@@ -97,7 +116,7 @@ function loseLife(game, reason) {
     : level.start;
   game.player = playerAt(spawn.x, spawn.y);
   game.player.invincible = 1.5;
-  if (level.boss) resetBoss(level.boss);
+  if (level.boss) bossRules(level.boss).reset(level.boss);
   game.cameraX = clamp(spawn.x - VIEW_WIDTH * 0.36, 0, level.width - VIEW_WIDTH);
   return true;
 }
@@ -109,20 +128,21 @@ export function keyAvailable(level) {
 
 function stepBoss(game, previousBottom, dt) {
   const { player: p, level: { boss } } = game;
-  const cue = updateBoss(boss, dt, p);
-  if (cue) game.events.push({ type: cue, x: boss.x + boss.w / 2, y: boss.y });
-  if (bossDefeated(boss) || !intersects(p, boss)) return false;
-  const onTop = p.vy > 0 && previousBottom <= boss.y + BOSS.stompTolerance;
-  if (onTop) {
-    const result = stompBoss(boss);
-    p.vy = -(result ? BOSS.stompBounce : BOSS.bonkBounce);
-    p.y = boss.y - p.h;
-    if (result === "boss-defeated") game.score += BOSS.score;
-    else if (result) game.score += 50;
-    game.events.push({ type: result ?? "boss-bonk", x: boss.x + boss.w / 2, y: boss.y, health: BOSS.hits - boss.hits });
-    return false;
+  const rules = bossRules(boss);
+  rules.update(boss, dt, p, (type, x = boss.x + boss.w / 2, y = boss.y) => game.events.push({ type, x, y }));
+  if (bossDefeated(boss)) return false;
+  if (intersects(p, boss)) {
+    const onTop = p.vy > 0 && previousBottom <= boss.y + rules.config.stompTolerance;
+    if (onTop) {
+      const result = rules.stomp(boss);
+      p.vy = -(result ? rules.config.stompBounce : rules.config.bonkBounce);
+      p.y = boss.y - p.h;
+      if (bossDefeated(boss)) game.score += rules.config.score;
+      else if (result) game.score += 50;
+      game.events.push({ type: result ?? "boss-bonk", x: boss.x + boss.w / 2, y: boss.y, health: rules.config.hits - boss.hits });
+    } else if (rules.dangerous(boss)) return loseLife(game, "boss");
   }
-  return bossDangerous(boss) && loseLife(game, "boss");
+  return rules.hazard(boss, p) && loseLife(game, "boss");
 }
 
 // Whether the pup standing on `surface` has its feet (centre) on ice.

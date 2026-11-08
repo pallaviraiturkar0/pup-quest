@@ -36,7 +36,7 @@ const DANGEROUS = new Set(["sleep", "roam", "windup", "charge"]);
 export function makeBoss({ name = "Mega-Vac", x, left, right, floor }) {
   if (!(left <= x && x + BOSS.w <= right)) throw new Error(`${name} at ${x} starts outside its arena ${left}-${right}`);
   return {
-    name, x, y: floor - BOSS.h, w: BOSS.w, h: BOSS.h, floor,
+    kind: "megavac", name, x, y: floor - BOSS.h, w: BOSS.w, h: BOSS.h, floor,
     left, right, home: x,
     mode: "sleep", timer: 0, direction: -1, hits: 0,
   };
