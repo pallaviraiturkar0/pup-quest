@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createGame, ICE, nextLevel, PHYSICS, startGame, stepGame } from "../src/engine.js";
 import { SECRET_INDEX } from "../src/levels.js";
 import { BOSS } from "../src/boss.js";
+import { YETI } from "../src/yeti.js";
 import { MAX_LIVES } from "../src/powerups.js";
 import { medalFor, runMs } from "../src/medals.js";
 
@@ -76,7 +77,7 @@ const ROUTES = [
   ],
 ];
 
-// Frosty Fjord, the secret trail, hops across icy ledges to the golden key on its highest one.
+// Frosty Fjord, the secret trail, hops across icy ledges to the Grumpy Yeti's arena.
 const SECRET_ROUTE = [
   [120, 208], [150, 176, true], [176, 176], [250, 144, true], [274, 144], [345, 176, true], [400, 176],
   [470, 144, true], [514, 144], [570, 176, true], [594, 176], [640, 176, true], [690, 176], [745, 144, true],
@@ -84,8 +85,62 @@ const SECRET_ROUTE = [
   [770, 144], [825, 112, true], [866, 112], [920, 176, true], [930, 176], [992, 176], [1060, 144, true], [1090, 144],
   [1140, 112, true], [1170, 112], [1240, 176, true], [1298, 176], [1370, 144, true], [1410, 144],
   [1460, 112, true], [1490, 112], [1530, 176, true], [1600, 176], [1590, 176], [1600, 176], [1670, 144, true], [1698, 144],
-  [1750, 112, true], [1790, 112], [1850, 176, true], [1940, 208], [1990, 160, true], [2080, 208, true], [2160, 208],
+  [1750, 112, true], [1790, 112], [1850, 176, true], [1940, 208], [1990, 160, true], [2080, 208, true], [2190, 208],
 ];
+
+// The Grumpy Yeti's arena: the pup waits on the left ice patch so the Yeti leaps
+// onto it and slips, sidesteps every snowball, hops shockwaves and rolling
+// snowballs, and stomps the Yeti's belly while it lies flat.
+const YETI_FIGHT = { ice: 2313, snow: 2262, safe: 2200, home: [[2600, 208], [2790, 208]] };
+
+function yetiInput(game) {
+  const { player: p, level: { boss: yeti } } = game;
+  const { snow, ice, safe } = YETI_FIGHT;
+  const pupCenter = p.x + p.w / 2;
+  let goal;
+  let jump = false;
+  if (yeti.mode === "sleep") goal = ice;
+  // Dodge each snowball to the other spot. Standing on the snow before the last
+  // throw means the final dodge lands the pup on the ice, right as the Yeti crouches.
+  else if (yeti.mode === "aim") goal = Math.abs(yeti.target - snow - p.w / 2) < Math.abs(yeti.target - ice - p.w / 2) ? ice : snow;
+  else if (yeti.mode === "idle") goal = Math.abs(yeti.x - yeti.home) > 1 ? safe : yeti.throwsLeft % 2 ? snow : ice;
+  else if (yeti.mode === "slip") {
+    goal = yeti.x + yeti.w / 2 - p.w / 2;
+    jump = Math.abs(yeti.x + yeti.w / 2 - pupCenter) < 34;
+  } else goal = safe;
+  for (const hazard of [...yeti.waves, ...yeti.snowballs.filter((ball) => ball.rolling)]) {
+    const speed = hazard.direction ? hazard.direction * YETI.wave.speed : hazard.vx;
+    const gap = hazard.x + hazard.w / 2 - pupCenter;
+    if (Math.abs(gap) < 44 && Math.sign(gap) !== Math.sign(speed)) jump = true;
+  }
+  return { goal, jump };
+}
+
+// Steps toward `goal` like `travel`, braking early on ice.
+function steer(game, goal, jump) {
+  const p = game.player;
+  const grip = p.grounded && p.onIce ? ICE.traction : 1;
+  const brakingDistance = p.vx * p.vx / (2 * PHYSICS.acceleration * grip);
+  const distance = goal - p.x;
+  const direction = Math.abs(distance) > brakingDistance + 0.6 ? Math.sign(distance) : 0;
+  stepGame(game, { left: direction < 0, right: direction > 0, jumpPressed: jump && p.grounded, jumpHeld: jump }, 1 / 120);
+}
+
+function fightYeti(game) {
+  const { boss: yeti } = game.level;
+  const seen = new Set();
+  let iceFrames = 0;
+  for (let frame = 0; frame < 120 * 60 && yeti.mode !== "defeated"; frame += 1) {
+    const { goal, jump } = yetiInput(game);
+    steer(game, goal, jump);
+    for (const event of game.events.splice(0)) seen.add(event.type);
+    if (game.player.onIce) iceFrames += 1;
+    assert.equal(game.deaths, 0, `the Grumpy Yeti caught the pup while it was in ${yeti.mode}`);
+  }
+  assert.equal(yeti.mode, "defeated", `the Yeti fight stalled with the Yeti in ${yeti.mode}`);
+  for (const [x, floor, jump] of YETI_FIGHT.home) travel(game, x, floor, jump);
+  return { seen, iceFrames };
+}
 
 // Moonlit Keep ends in the Mega-Vac's arena: wait on the left wall ledge, let it
 // charge into the wall, drop onto its lid while it's dizzy, then hop back.
@@ -167,13 +222,18 @@ test("a real-input playthrough beats the Mega-Vac, reaches every golden key, and
   assert.ok(game.totalTreats > 0);
 });
 
-test("a real-input run of the secret icy trail finds the key and wins inside gold par without losing a heart", () => {
+test("a real-input run of the secret icy trail befriends the Grumpy Yeti, finds the key and wins inside gold par without losing a heart", () => {
   const game = createGame(SECRET_INDEX);
   startGame(game);
   stepGame(game);
   let iceFrames = 0;
   for (const [x, floor, jump] of SECRET_ROUTE) iceFrames += travel(game, x, floor, jump);
   assert.ok(iceFrames >= 120, `the route really crosses the ice (${iceFrames} frames)`);
+  const fight = fightYeti(game);
+  for (const type of ["yeti-wake", "yeti-aim", "yeti-throw", "yeti-crouch", "yeti-slip", "yeti-hit", "yeti-befriended"]) {
+    assert.ok(fight.seen.has(type), `the fight never showed ${type}`);
+  }
+  assert.ok(fight.iceFrames > 0, "the pup lures the Yeti from the ice");
   assert.equal(game.keyFound, true);
   assert.equal(game.status, "won");
   assert.equal(medalFor(runMs(game.levelTime), game.level.par), "gold", `${game.levelTime.toFixed(2)}s misses gold`);

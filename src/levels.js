@@ -1,5 +1,6 @@
 import { makeBoss } from "./boss.js";
 import { makeEnemy } from "./enemies.js";
+import { makeYeti } from "./yeti.js";
 import { makePowerup } from "./powerups.js";
 
 export const TILE = 16;
@@ -53,7 +54,10 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     exit: { x: (columns - 6) * TILE, y: GROUND_Y - 32, w: 32, h: 32 },
     // A boss guards an arena between two columns and drops the golden key when beaten.
     secret,
-    boss: boss && makeBoss({ x: boss.x * TILE, left: boss.left * TILE, right: boss.right * TILE, floor: GROUND_Y }),
+    // `kind: "yeti"` picks the Grumpy Yeti, which also needs to know where the arena's ice is.
+    boss: boss && (boss.kind === "yeti"
+      ? makeYeti({ x: boss.x * TILE, left: boss.left * TILE, right: boss.right * TILE, floor: GROUND_Y, ice: ice.map(([x, w]) => ({ x: x * TILE, w: w * TILE })) })
+      : makeBoss({ x: boss.x * TILE, left: boss.left * TILE, right: boss.right * TILE, floor: GROUND_Y })),
   };
 }
 
@@ -163,30 +167,32 @@ export const LEVELS = [
 ];
 
 // A secret bonus trail, outside the main campaign. It opens once the player beats the Mega-Vac
-// or earns a gold paw on any trail (see `secretTrailOpen` in trailmap.js).
+// or earns a gold paw on any trail (see `secretTrailOpen` in trailmap.js). It ends in the
+// Grumpy Yeti's arena, where two ice patches are the key to tripping it up.
 export const SECRET_TRAIL = trail({
-  name: "Frosty Fjord", theme: "arctic", columns: 140, par: [32, 44, 66], secret: true,
+  name: "Frosty Fjord", theme: "arctic", columns: 180, par: [66, 88, 130], secret: true,
   gaps: [[22, 3], [40, 3], [58, 4], [78, 3], [96, 4], [116, 3]],
   platforms: [
     [9, 11, 3], [15, 9, 3, "ice"], [21, 11, 5], [29, 9, 4, "ice"], [35, 11, 3], [39, 11, 5], [46, 9, 3],
     [51, 7, 4, "ice"], [57, 11, 6], [66, 9, 3, "ice"], [71, 7, 3], [77, 11, 5], [85, 9, 4, "ice"], [91, 7, 3],
     [95, 11, 6], [104, 9, 3], [109, 7, 4, "ice"], [115, 11, 5], [124, 10, 3],
   ],
-  ice: [[12, 6], [27, 5], [64, 8], [102, 6], [121, 5]],
+  ice: [[12, 6], [27, 5], [64, 8], [102, 6], [121, 5], [143, 4], [155, 4]],
   treats: [
     [6, 188], [10, 164], [13, 188], [16, 132], [17, 132], [22, 164], [24, 164], [30, 132], [32, 132], [36, 164],
     [40, 164], [42, 164], [47, 132], [52, 100], [54, 100], [58, 164], [61, 164], [67, 132], [68, 132], [72, 100],
-    [79, 164], [86, 132], [88, 132], [92, 100], [97, 164], [99, 164], [105, 132], [116, 164], [118, 164], [125, 148],
-    [131, 188],
+    [79, 164], [86, 132], [88, 132], [92, 100], [97, 164], [99, 164], [105, 132], [111, 94], [116, 164], [118, 164], [125, 148],
+    [131, 188], [168, 188], [169, 188],
   ],
   powerups: [["bone", 53, 100], ["squeaky", 70, 188], ["zoomies", 98, 156]],
-  key: [111, 94], checkpoint: 82,
+  key: [151, 184], checkpoint: 136,
   spikes: [[34, 1], [48, 2], [74, 1], [93, 1], [128, 1]],
   enemies: [
     [52, 50, 55, 22], [87, 86, 89, 24], [112, 111, 114, 24],
     { type: "seagull", x: 59, left: 58, right: 64, speed: 24 },
     { type: "seagull", x: 97, left: 96, right: 103, speed: 26, phase: 1.3 },
   ],
+  boss: { kind: "yeti", x: 151, left: 140, right: 164 },
 });
 
 // Every playable trail: the campaign, then the secret trail at index `SECRET_INDEX`.

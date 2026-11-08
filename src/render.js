@@ -1,5 +1,6 @@
 import { BOSS, bossHealth } from "./boss.js";
 import { keyAvailable } from "./engine.js";
+import { YETI, yetiHealth, yetiLying } from "./yeti.js";
 import { GROUND_Y, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
 import { activeParticles, calmParticles, clearParticles, createParticles, emitForEvent, particleAlpha, SHAPE_PIXELS, updateParticles } from "./particles.js";
 import { resolveColor, THEMES, themeForLevel } from "./themes.js";
@@ -766,7 +767,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
 
   const CRITTERS = { squirrel: critter, vacuum, seagull, cat };
 
-  // Stone posts mark the Mega-Vac's arena walls, holding up the safe ledges.
+  // Stone posts mark a boss arena's walls (holding up the Mega-Vac's safe ledges).
   function arenaWalls(boss, palette) {
     for (const x of [boss.left - 6, boss.right]) {
       rect(x, GROUND_Y - 32, 6, 32, palette.stone);
@@ -842,6 +843,163 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     }
   }
 
+  // The Grumpy Yeti: a huge shaggy snow-dog with floppy ears and a red collar.
+  // Its tells: a snowball that grows overhead before a throw, and a crouch with
+  // a blinking shadow on the floor where it is about to land.
+  const YETI_COLORS = { fur: "#f4f7fb", shade: "#c9d6e4", dark: "#9fb2c8", skin: "#7d8fa6", eye: "#1d2028", belly: "#f2c4cf", collar: "#ef6f6c", tag: "#f6c453" };
+
+  function yetiHazards(yeti, time, reducedMotion) {
+    const { floor } = yeti;
+    if (yeti.mode === "crouch" || yeti.mode === "leap") {
+      const blink = yeti.mode === "crouch" && !reducedMotion && Math.floor(time * 8) % 2;
+      ctx.globalAlpha = blink ? 0.25 : 0.5;
+      rect(yeti.leap?.to ?? yeti.target, floor - 2, YETI.w, 3, "#62758f");
+      ctx.globalAlpha = 1;
+    }
+    for (const ball of yeti.snowballs) {
+      if (!ball.rolling) {
+        ctx.globalAlpha = 0.4;
+        rect(ball.landX, floor - 2, ball.w, 2, "#62758f");
+        ctx.globalAlpha = 1;
+      }
+      rect(ball.x + 1, ball.y, ball.w - 2, ball.h, "#ffffff");
+      rect(ball.x, ball.y + 1, ball.w, ball.h - 2, "#ffffff");
+      rect(ball.x + ball.w - 4, ball.y + ball.h - 4, 3, 3, YETI_COLORS.shade);
+    }
+    for (const wave of yeti.waves) {
+      rect(wave.x, wave.y + 3, wave.w, wave.h - 3, "#e6eff4");
+      rect(wave.x + 2, wave.y, wave.w - 4, 3, "#ffffff");
+      rect(wave.x + (wave.direction > 0 ? wave.w - 3 : 0), wave.y + 2, 3, 2, "#b9e1f2");
+    }
+  }
+
+  function yetiStanding(yeti, time, reducedMotion) {
+    const c = YETI_COLORS;
+    const { mode } = yeti;
+    const crouch = mode === "crouch" ? 5 : 0;
+    rect(6, 34, 8, 6, c.shade);
+    rect(18, 34, 8, 6, c.shade);
+    rect(6, 38, 8, 2, c.dark);
+    rect(18, 38, 8, 2, c.dark);
+    ctx.save();
+    const shake = crouch && !reducedMotion ? Math.floor(time * 30) % 2 : 0;
+    ctx.translate(shake, crouch);
+    rect(4, 12, 24, 24 - crouch, c.fur);
+    rect(9, 17, 14, 12 - crouch, "#ffffff");
+    rect(4, 30 - crouch, 24, 4, c.shade);
+    rect(7, 0, 20, 14, c.fur);
+    rect(7, 2, 5, 10, c.dark);
+    rect(15, 4, 12, 9, c.skin);
+    rect(17, 6, 2, 2, c.eye);
+    rect(23, 6, 2, 2, c.eye);
+    // Grumpy brows slope down toward the snout.
+    rect(16, 4, 3, 1, c.dark);
+    rect(19, 5, 1, 1, c.dark);
+    rect(22, 5, 1, 1, c.dark);
+    rect(23, 4, 3, 1, c.dark);
+    rect(26, 8, 3, 2, c.eye);
+    rect(19, 11, 6, 1, c.eye);
+    rect(7, 13, 20, 2, c.collar);
+    rect(16, 15, 2, 2, c.tag);
+    if (mode === "aim") {
+      // The arm goes up and a snowball grows in its paw: the throw is coming.
+      const progress = 1 - Math.max(0, yeti.timer) / YETI.aim[Math.min(yeti.hits, YETI.hits - 1)];
+      const size = 4 + Math.round(progress * 6);
+      rect(1, 15, 4, 14, c.shade);
+      rect(24, -6, 4, 20, c.shade);
+      rect(26 - size / 2, -7 - size, size, size, "#ffffff");
+    } else if (mode === "leap") {
+      rect(1, -4, 4, 16, c.shade);
+      rect(27, -4, 4, 16, c.shade);
+    } else {
+      rect(1, 15, 4, 14, c.shade);
+      rect(27, 15, 4, 14, c.shade);
+    }
+    ctx.restore();
+  }
+
+  function yetiLyingDown(yeti, time, reducedMotion) {
+    const c = YETI_COLORS;
+    const { mode } = yeti;
+    const happy = mode === "defeated";
+    const wag = happy && !reducedMotion ? (Math.floor(time * 8) % 2) * 2 : 0;
+    if (happy) rect(-5, 7 + wag, 6, 3, c.fur);
+    rect(0, 6, 24, 10, c.fur);
+    rect(0, 13, 24, 3, c.shade);
+    // The pink belly: the spot to stomp while it's down.
+    rect(5, 4, 15, 5, c.belly);
+    rect(3, 0, 4, 6, c.shade);
+    rect(15, 0, 4, 6, c.shade);
+    rect(21, 4, 11, 12, c.fur);
+    rect(23, 3, 4, 6, c.dark);
+    rect(24, 8, 8, 6, c.skin);
+    rect(29, 12, 3, 2, c.eye);
+    rect(21, 4, 2, 10, c.collar);
+    if (happy) {
+      rect(25, 9, 2, 1, c.eye);
+      rect(29, 9, 2, 1, c.eye);
+      rect(26, 14, 3, 2, c.collar);
+    } else {
+      for (const ex of [25, 29]) {
+        rect(ex, 9, 1, 1, c.eye);
+        rect(ex + 1, 10, 1, 1, c.eye);
+        rect(ex + 1, 9, 1, 1, c.eye);
+        rect(ex, 10, 1, 1, c.eye);
+      }
+    }
+  }
+
+  function yeti(boss, time, reducedMotion) {
+    const { mode } = boss;
+    yetiHazards(boss, time, reducedMotion);
+    if (mode === "hurt" && !reducedMotion && Math.floor(time * 16) % 2) return;
+    ctx.save();
+    ctx.translate(Math.round(boss.x), Math.round(boss.y));
+    if (boss.direction < 0) { ctx.translate(boss.w, 0); ctx.scale(-1, 1); }
+    if (yetiLying(boss)) yetiLyingDown(boss, time, reducedMotion);
+    else yetiStanding(boss, time, reducedMotion);
+    ctx.restore();
+    const cx = boss.x + boss.w / 2;
+    if (mode === "sleep") {
+      const bob = reducedMotion ? 0 : Math.floor(time * 2) % 3;
+      for (const [dx, dy] of [[4, 0], [11, -7]]) {
+        const zx = cx + dx;
+        const zy = boss.y - 10 + dy - bob;
+        rect(zx, zy, 4, 1, "#fff4ca");
+        rect(zx + 2, zy + 1, 1, 1, "#fff4ca");
+        rect(zx + 1, zy + 2, 1, 1, "#fff4ca");
+        rect(zx, zy + 3, 4, 1, "#fff4ca");
+      }
+    }
+    if (mode === "crouch") {
+      rect(cx - 1, boss.y - 16, 3, 7, "#ffe45c");
+      rect(cx - 1, boss.y - 7, 3, 2, "#ffe45c");
+    }
+    if (mode === "slip") {
+      for (let i = 0; i < 3; i += 1) {
+        const angle = (reducedMotion ? 0 : time * 5) + i * Math.PI * 2 / 3;
+        rect(cx + Math.cos(angle) * 14 - 1, boss.y - 7 + Math.sin(angle) * 3, 3, 3, "#ffe45c");
+      }
+    }
+    if (mode === "defeated") {
+      const bob = reducedMotion ? 0 : Math.floor(time * 3) % 3;
+      for (const [dx, dy] of [[-10, 0], [8, -6]]) {
+        const hx = cx + dx;
+        const hy = boss.y - 12 + dy - bob;
+        rect(hx, hy, 2, 2, "#ef6f6c");
+        rect(hx + 3, hy, 2, 2, "#ef6f6c");
+        rect(hx, hy + 1, 5, 2, "#ef6f6c");
+        rect(hx + 1, hy + 3, 3, 1, "#ef6f6c");
+        rect(hx + 2, hy + 4, 1, 1, "#ef6f6c");
+      }
+    }
+    if (mode !== "sleep" && mode !== "defeated") {
+      for (let i = 0; i < YETI.hits; i += 1) {
+        rect(cx - 13 + i * 9, boss.y - 24, 7, 4, i < yetiHealth(boss) ? "#ef6f6c" : "#4f566a");
+      }
+    }
+  }
+
   function effect(event, reducedMotion = false) {
     return emitForEvent(particles, event, { reducedMotion });
   }
@@ -902,7 +1060,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     }
     if (game.level.boss) {
       arenaWalls(game.level.boss, palette);
-      megaVac(game.level.boss, decorativeTime, reducedMotion);
+      (game.level.boss.kind === "yeti" ? yeti : megaVac)(game.level.boss, decorativeTime, reducedMotion);
     }
     if (!game.keyFound && keyAvailable(game.level)) goldenKey(game.level.key.x, game.level.key.y, decorativeTime);
     for (const item of game.level.powerups ?? []) {
