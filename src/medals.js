@@ -1,6 +1,7 @@
 // Time trials: per-trail best times and paw medals, kept free of the DOM so they run under node tests.
 // Best times are saved as JSON under `pup-quest:best-times`, mapping trail numbers ("1", "2", …) to
-// whole milliseconds, e.g. {"1":19420,"3":25110}. Trails never cleared are simply absent.
+// whole milliseconds, e.g. {"1":19420,"3":25110}. Trails never cleared are simply absent. A trail whose
+// course changes enough to make old times unfair can set `record` to save under a new key instead.
 
 export const BEST_TIMES_KEY = "best-times";
 export const MEDALS = Object.freeze(["gold", "silver", "bronze"]);
@@ -32,9 +33,18 @@ export function nextMedal(ms, par) {
   return { medal: target, ms: par[target] * 1000 };
 }
 
+// Each trail's storage key: its number unless the level names its own `record` key.
+export function recordKeys(trails) {
+  return trails.map((trail, index) => trail?.record ?? String(index + 1));
+}
+
+// `keys` is either the trail count (numbered keys) or the list from recordKeys.
+const keyList = (keys) => (Array.isArray(keys) ? keys : Array.from({ length: keys }, (_, index) => String(index + 1)));
+
 // Missing, unreadable, or tampered data never throws: bad entries are dropped one by one.
-export function parseBestTimes(raw, total) {
-  const times = Array(total).fill(null);
+export function parseBestTimes(raw, keys) {
+  const names = keyList(keys);
+  const times = Array(names.length).fill(null);
   if (typeof raw !== "string" || raw === "") return times;
   let data;
   try {
@@ -43,22 +53,23 @@ export function parseBestTimes(raw, total) {
     return times;
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return times;
-  for (let index = 0; index < total; index += 1) {
-    const value = Object.hasOwn(data, String(index + 1)) ? data[String(index + 1)] : null;
+  names.forEach((name, index) => {
+    const value = Object.hasOwn(data, name) ? data[name] : null;
     if (validMs(value)) times[index] = value;
-  }
+  });
   return times;
 }
 
-export function serializeBestTimes(times) {
+export function serializeBestTimes(times, keys = times.length) {
+  const names = keyList(keys);
   const data = {};
-  times.forEach((ms, index) => { if (validMs(ms)) data[String(index + 1)] = ms; });
+  times.forEach((ms, index) => { if (validMs(ms)) data[names[index]] = ms; });
   return JSON.stringify(data);
 }
 
 // Another tab may have saved faster runs since this one loaded; the faster time wins per trail.
-export function mergeBestTimes(current, raw, total) {
-  const saved = parseBestTimes(raw, total);
+export function mergeBestTimes(current, raw, keys) {
+  const saved = parseBestTimes(raw, keys);
   return saved.map((ms, index) => {
     const mine = validMs(current[index]) ? current[index] : null;
     if (ms === null) return mine;
@@ -67,9 +78,9 @@ export function mergeBestTimes(current, raw, total) {
 }
 
 // The step that must run under the cross-tab lock: fold the stored times into this tab's, return what to write.
-export function commitBestTimes(current, raw, total) {
-  const times = mergeBestTimes(current, raw, total);
-  return { times, raw: serializeBestTimes(times) };
+export function commitBestTimes(current, raw, keys) {
+  const times = mergeBestTimes(current, raw, keys);
+  return { times, raw: serializeBestTimes(times, keys) };
 }
 
 // Runs `task` while holding a Web Lock so tabs take turns saving. Browsers without the

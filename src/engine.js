@@ -140,9 +140,7 @@ function stepBoss(game, previousBottom, dt) {
       if (bossDefeated(boss)) game.score += rules.config.score;
       else if (result) game.score += 50;
       game.events.push({ type: result ?? "boss-bonk", x: boss.x + boss.w / 2, y: boss.y, health: rules.config.hits - boss.hits });
-      return false;
-    }
-    if (rules.dangerous(boss)) return loseLife(game, "boss");
+    } else if (rules.dangerous(boss)) return loseLife(game, "boss");
   }
   return rules.hazard(boss, p) && loseLife(game, "boss");
 }

@@ -5,7 +5,7 @@ import { createRenderer } from "./render.js";
 import { themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
 import {
-  BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_LABELS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes, recordBestTime,
+  BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_LABELS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes, recordBestTime, recordKeys,
   runMs, spokenTime, withSaveLock,
 } from "./medals.js";
 import {
@@ -77,7 +77,8 @@ if (!Number.isSafeInteger(bestScore) || bestScore < 0) {
 }
 let unlockedTrails = parseUnlocked(savedPreference(UNLOCK_KEY), LEVELS.length);
 let trailMap = null;
-let bestTimes = parseBestTimes(savedPreference(BEST_TIMES_KEY), TRAILS.length);
+const RECORD_KEYS = recordKeys(TRAILS);
+let bestTimes = parseBestTimes(savedPreference(BEST_TIMES_KEY), RECORD_KEYS);
 let shownTimer = "";
 let kennel = null;
 let skinId = DEFAULT_SKIN;
@@ -318,7 +319,7 @@ function latestUnlocked() {
 }
 
 function latestBestTimes() {
-  bestTimes = mergeBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), TRAILS.length);
+  bestTimes = mergeBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), RECORD_KEYS);
   return bestTimes;
 }
 
@@ -344,7 +345,7 @@ function recordClear(index) {
 // Re-read and merge under a cross-tab lock so two tabs saving at once can't drop each other's records.
 function saveBestTimes() {
   withSaveLock(navigator.locks, `pup-quest:${BEST_TIMES_KEY}`, () => {
-    const commit = commitBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), TRAILS.length);
+    const commit = commitBestTimes(bestTimes, savedPreference(BEST_TIMES_KEY), RECORD_KEYS);
     bestTimes = commit.times;
     savedPreference(BEST_TIMES_KEY, commit.raw);
   }).catch((error) => console.warn("Pup Quest could not save a best time:", error));

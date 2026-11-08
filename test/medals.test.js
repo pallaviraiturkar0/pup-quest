@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_COLORS, MEDALS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes,
-  recordBestTime, runMs, serializeBestTimes, spokenTime, withSaveLock,
+  recordBestTime, recordKeys, runMs, serializeBestTimes, spokenTime, withSaveLock,
 } from "../src/medals.js";
 import { createGame, pauseGame, resumeGame, startGame, stepGame } from "../src/engine.js";
 import { LEVELS, TRAILS } from "../src/levels.js";
@@ -49,13 +49,19 @@ test("every trail has ordered, positive par times", () => {
   }
 });
 
-test("the secret trail's best time is saved under its own trail number", () => {
+test("the secret trail's best time is saved under its own key, apart from runs before the Yeti arrived", () => {
+  const keys = recordKeys(TRAILS);
+  assert.deepEqual(keys.slice(0, TOTAL), LEVELS.map((_, index) => String(index + 1)), "campaign trails keep their numbers");
+  assert.equal(keys[TRAILS.length - 1], "8-yeti");
   const times = Array(TRAILS.length).fill(null);
   times[TRAILS.length - 1] = 30_000;
-  const raw = serializeBestTimes(times);
-  assert.equal(raw, `{"${TRAILS.length}":30000}`);
-  assert.deepEqual(parseBestTimes(raw, TRAILS.length), times);
-  assert.deepEqual(parseBestTimes('{"1":20000}', TRAILS.length).slice(0, 2), [20_000, null], "older saves still load");
+  const raw = serializeBestTimes(times, keys);
+  assert.equal(raw, '{"8-yeti":30000}');
+  assert.deepEqual(parseBestTimes(raw, keys), times);
+  const old = '{"1":20000,"8":55000}';
+  assert.deepEqual(parseBestTimes(old, keys), [20_000, ...Array(TRAILS.length - 1).fill(null)], "campaign records load; a boss-free Fjord time is not a Yeti-run record");
+  const commit = commitBestTimes(times, old, keys);
+  assert.equal(commit.raw, '{"1":20000,"8-yeti":30000}');
 });
 
 test("saved best times survive missing, corrupt, and tampered data", () => {

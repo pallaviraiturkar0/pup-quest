@@ -207,6 +207,14 @@ test("in the engine, the key stays hidden until the Yeti is befriended, stomps b
   assert.equal(game.deaths, 2, "a snowball costs a heart");
   yeti.ice.pop();
 
+  Object.assign(yeti, { mode: "idle", timer: 10 });
+  yeti.snowballs.push({ x: yeti.x + 8, y: yeti.y - 14, w: 10, h: 10, vx: 0, vy: 0 });
+  place(game, yeti.x + 10, yeti.y - 18, 120);
+  stepGame(game);
+  assert.ok(game.events.some((event) => event.type === "boss-bonk"));
+  assert.equal(game.deaths, 3, "bouncing off its head into a fresh snowball still costs a heart");
+  Object.assign(game, { lives: 3, status: "playing" });
+
   const score = game.score;
   for (let round = 1; round <= YETI.hits; round += 1) {
     Object.assign(yeti, { mode: "slip", timer: YETI.slip, x: yeti.left + 50, h: YETI.lyingH, y: GROUND_Y - YETI.lyingH, vx: 0 });
@@ -214,7 +222,7 @@ test("in the engine, the key stays hidden until the Yeti is befriended, stomps b
     place(game, yeti.x + 10, yeti.y - 18, 120);
     stepGame(game);
     assert.equal(yeti.hits, round);
-    assert.equal(game.deaths, 2, "belly stomps never hurt the pup");
+    assert.equal(game.deaths, 3, "belly stomps never hurt the pup");
   }
   assert.equal(yeti.mode, "defeated");
   assert.ok(game.events.some((event) => event.type === "yeti-befriended"), "the victory moment is announced");

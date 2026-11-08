@@ -8,7 +8,7 @@ export const VIEW_WIDTH = 480;
 export const VIEW_HEIGHT = 256;
 export const GROUND_Y = 208;
 
-function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null, ice = [], secret = false }) {
+function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null, ice = [], secret = false, record }) {
   if (!Array.isArray(par) || par.length !== 3 || !par.every((seconds, index) => Number.isFinite(seconds) && seconds > (par[index - 1] ?? 0))) {
     throw new Error(`${name}: par must be [gold, silver, bronze] seconds in increasing order`);
   }
@@ -23,6 +23,8 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     theme,
     // Time-trial par times in seconds: [gold, silver, bronze].
     par: { gold: par[0], silver: par[1], bronze: par[2] },
+    // Best-time storage key when it differs from the trail number (see recordKeys in medals.js).
+    ...(record ? { record } : {}),
     width: columns * TILE,
     start: { x: 48, y: GROUND_Y - 18 },
     ground,
@@ -171,6 +173,8 @@ export const LEVELS = [
 // Grumpy Yeti's arena, where two ice patches are the key to tripping it up.
 export const SECRET_TRAIL = trail({
   name: "Frosty Fjord", theme: "arctic", columns: 180, par: [66, 88, 130], secret: true,
+  // The Yeti made the course longer, so earlier boss-free Fjord times are kept apart from these.
+  record: "8-yeti",
   gaps: [[22, 3], [40, 3], [58, 4], [78, 3], [96, 4], [116, 3]],
   platforms: [
     [9, 11, 3], [15, 9, 3, "ice"], [21, 11, 5], [29, 9, 4, "ice"], [35, 11, 3], [39, 11, 5], [46, 9, 3],

@@ -69,7 +69,7 @@ A hidden bonus trail appears on the Trail Map as a glowing ★ stop after you ei
 
 - Frosty Fjord is a single-trail challenge under an aurora with falling snow and icy parallax peaks. Clearing it shows its own victory screen, and **Slide again** replays it.
 - Glossy blue **ice** covers some ground patches and ledges. On ice Biscuit has 30% of his usual grip, so he speeds up and stops more slowly (a full-speed slide carries about a tile and a half). Top speed, jumping, and air control are unchanged, and icy ledges keep a grippy tile at each end, and ground ice is never placed next to a cliff edge, a spike, a critter's patrol, or a start, checkpoint, or exit.
-- It is timed like every trail, with its own par times and paw medal, saved as trail 8 in `pup-quest:best-times`.
+- It is timed like every trail, with its own par times and paw medal, saved under the key `8-yeti` in `pup-quest:best-times`. Times from before the Yeti arrived (saved as `8`) came from a shorter course, so they no longer count toward its medal.
 
 #### Secret boss: the Grumpy Yeti
 
@@ -104,7 +104,7 @@ Gold is about 10% slower than the full-campaign input replay used in the tests (
 
 The Trail Map shows each cleared trail's best time and a medal badge on its stop, and the selected stop's details appear under the map title. Screen readers hear run times, best times, and medals in words, both on the level-clear screen and on each map stop. Medals are drawn as inline pixel-art SVG, and with **prefers-reduced-motion** the New best! pop animation is turned off.
 
-Best times are saved per trail on your device under `pup-quest:best-times`. Unreadable or tampered entries are ignored. Saves re-read the stored times under a cross-tab [Web Lock](https://developer.mozilla.org/docs/Web/API/Web_Locks_API) (when the browser supports it), so if another tab saved a faster time, the faster time is kept.
+Best times are saved per trail on your device under `pup-quest:best-times`, keyed by trail number (a level can set its own `record` key when its course changes). Unreadable or tampered entries are ignored. Saves re-read the stored times under a cross-tab [Web Lock](https://developer.mozilla.org/docs/Web/API/Web_Locks_API) (when the browser supports it), so if another tab saved a faster time, the faster time is kept.
 
 ### Dog Kennel
 
