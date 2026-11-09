@@ -235,6 +235,8 @@ function syncOverlay() {
 }
 
 function updateUi() {
+  // A title or results screen left open past midnight UTC switches to the new day's walk.
+  if (daily.date !== utcDateKey()) syncDailyButton();
   const signature = [game.status, game.levelIndex, game.lives, game.levelTreats, game.keyFound, game.score, bossPhase()].join(":");
   if (signature === previousHud) return;
   previousHud = signature;
