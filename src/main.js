@@ -199,7 +199,7 @@ function syncOverlay() {
       : ["ONE TRAIL CLOSER TO HOME", "Look at you go!", `${game.level.name}, conquered. A fresh trail and a little extra heart are waiting.`, "Next trail"],
     "game-over": ["EVERY ADVENTURE TAKES PRACTICE", "A little tumble.", "Even the best dogs miss a jump. Shake it off, wag that tail, and give it another go.", "Try again"],
     won: walk
-      ? ["DAILY WALK COMPLETE", "Walkies done, good dog!", `${walk.title}, conquered! ${run?.newBest ? "That's your best time today." : run?.best ? `Today's best is ${formatTime(run.best)}.` : ""} A brand-new walk arrives at midnight UTC.`, "Walk again"]
+      ? ["DAILY WALK COMPLETE", "Walkies done, good dog!", dailyResultText(walk, run), "Walk again"]
       : secret
       ? ["SECRET TRAIL CONQUERED", "Brrr-avo, good dog!", `${game.level.name}, conquered! The Grumpy Yeti just needed a belly rub, and now it's your fluffiest friend. Race it again to chase a shinier paw medal.`, "Slide again"]
       : ["CHAMPION OF MOONLIT KEEP", "Victory, very good dog!", "The Mega-Vac is out of power and the golden key is home. Seven trails, a pocket full of treats, and the comfiest nap in the kingdom. Well done, Biscuit.", "Play again"],
@@ -223,7 +223,7 @@ function syncOverlay() {
   const stats = ["level-complete", "game-over", "won"].includes(game.status)
     ? [["TREATS", single ? `${game.levelTreats}/${game.level.treats.length}` : String(game.totalTreats)], ["SCORE", String(game.score)], ["TIME", single ? formatTime(run.ms) : timeLabel(game.elapsed)]]
     : [];
-  if (game.status === "won") stats.push(walk ? ["BEST TODAY", formatTime(run.best ?? run.ms)] : ["TUMBLES", String(game.deaths)]);
+  if (game.status === "won") stats.push(walk ? dailyBestStat(run) : ["TUMBLES", String(game.deaths)]);
   setResultStats(stats);
   // Daily Walks race today's best instead of a trail's paw medals.
   showMedalResult(walk ? null : run);
@@ -387,18 +387,39 @@ function startDailyWalk() {
   focusGame();
 }
 
+function dailyResultText(walk, run) {
+  const best = run?.newBest ? "That's your best time today." : run?.best ? `Today's best is ${formatTime(run.best)}.` : "";
+  return `${walk.title}, conquered! ${best} A brand-new walk arrives at midnight UTC.`;
+}
+
+const dailyBestStat = (run) => ["BEST TODAY", formatTime(run.best ?? run.ms)];
+
 // Saves the walk's time when it beats today's best, re-reading under the lock so tabs never drop a faster run.
+// If another tab saved a faster time first, the results screen (if this run's is still showing) is corrected.
+let shownDailyRun = null;
 function recordDailyClear() {
   const ms = runMs(game.levelTime);
   const { date } = game.level.daily;
   const result = commitDailyBest(ms, savedPreference(DAILY_BEST_KEY), date);
+  const run = { ms, best: result.best, newBest: result.newBest };
+  shownDailyRun = run;
   if (result.raw) {
     withSaveLock(navigator.locks, `pup-quest:${DAILY_BEST_KEY}`, () => {
       const commit = commitDailyBest(ms, savedPreference(DAILY_BEST_KEY), date);
       if (commit.raw) savedPreference(DAILY_BEST_KEY, commit.raw);
-    }).then(syncDailyButton).catch((error) => console.warn("Pup Quest could not save a Daily Walk time:", error));
+      return commit;
+    }).then((commit) => {
+      syncDailyButton();
+      if (commit.best === run.best && commit.newBest === run.newBest) return;
+      Object.assign(run, { best: commit.best, newBest: commit.newBest });
+      if (shownDailyRun !== run || game.status !== "won" || !game.level.daily) return;
+      $("overlay-description").textContent = dailyResultText(game.level.daily, run);
+      const stats = $("result-stats").lastElementChild;
+      if (stats) stats.firstElementChild.textContent = dailyBestStat(run)[1];
+      announce(`Another tab saved a faster walk. Today's best is ${spokenTime(run.best)}.`);
+    }).catch((error) => console.warn("Pup Quest could not save a Daily Walk time:", error));
   }
-  return { ms, best: result.best, newBest: result.newBest };
+  return run;
 }
 
 // Re-read and merge under a cross-tab lock so two tabs saving at once can't drop each other's records.
@@ -412,6 +433,7 @@ function saveBestTimes() {
 
 window.addEventListener("storage", (event) => {
   // A null key means another tab cleared all of storage.
+  if (event.key === `pup-quest:${DAILY_BEST_KEY}` || event.key === null) syncDailyButton();
   if (event.key !== null && ![`pup-quest:${BEST_TIMES_KEY}`, `pup-quest:${SKIN_KEY}`].includes(event.key)) return;
   latestBestTimes();
   applySavedSkin();
