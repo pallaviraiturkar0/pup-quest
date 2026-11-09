@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, ICE, nextLevel, PHYSICS, startGame, stepGame } from "../src/engine.js";
-import { SECRET_INDEX } from "../src/levels.js";
+import { LEVELS, SECRET_INDEX } from "../src/levels.js";
+import { createRandom, dailyChallenge, MODIFIER_IDS, MODIFIERS, remixTrail } from "../src/daily.js";
 import { BOSS } from "../src/boss.js";
 import { YETI } from "../src/yeti.js";
 import { MAX_LIVES } from "../src/powerups.js";
@@ -238,4 +239,38 @@ test("a real-input run of the secret icy trail befriends the Grumpy Yeti, finds 
   assert.equal(game.status, "won");
   assert.equal(medalFor(runMs(game.levelTime), game.level.par), "gold", `${game.levelTime.toFixed(2)}s misses gold`);
   assert.equal(game.deaths, 0);
+});
+
+test("every Daily Walk remix stays winnable: the real-input route finds the key and reaches the doghouse with each modifier", () => {
+  for (const modifier of MODIFIER_IDS) {
+    for (const trail of MODIFIERS[modifier].trails) {
+      for (const seed of [1, 2024, 0xdecafbad]) {
+        const level = remixTrail(LEVELS[trail], modifier, createRandom(seed));
+        level.daily = { trail, modifier };
+        const game = createGame(trail, { level });
+        startGame(game);
+        stepGame(game);
+        let iceFrames = 0;
+        for (const [x, floor, jump] of ROUTES[trail]) iceFrames += travel(game, x, floor, jump);
+        const label = `${level.name} (${modifier}, seed ${seed})`;
+        assert.equal(game.keyFound, true, `${label}: golden key was not reachable`);
+        assert.equal(game.status, "won", `${label}: the walk should end at the doghouse`);
+        assert.equal(game.deaths, 0, label);
+        if (modifier === "slippery") assert.ok(iceFrames > 0, `${label}: the route never touched the ice`);
+      }
+    }
+  }
+});
+
+test("a whole year of real Daily Walks can be won with real inputs", () => {
+  const day = Date.UTC(2027, 0, 1);
+  for (let offset = 0; offset < 365; offset += 1) {
+    const { date, trail, level } = dailyChallenge(new Date(day + offset * 864e5).toISOString().slice(0, 10));
+    const game = createGame(trail, { level });
+    startGame(game);
+    stepGame(game);
+    for (const [x, floor, jump] of ROUTES[trail]) travel(game, x, floor, jump);
+    assert.equal(game.status, "won", `${date}: ${level.daily.title} was not won`);
+    assert.equal(game.deaths, 0, date);
+  }
 });

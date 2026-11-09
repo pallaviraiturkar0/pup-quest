@@ -63,6 +63,20 @@ Pick **Trail map** on the title screen (or after a game over or victory) to see 
 - Starting from the map plays from that trail to the finale with three fresh hearts. Trying again after a game over restarts from the trail you picked; playing again after a victory starts over from Trail 01.
 - With **prefers-reduced-motion**, the marching trail and hopping paw animations are turned off.
 
+### Daily Walk
+
+Every day brings one remixed trail, the same for every player. Pick **Daily walk** on the title screen (or after a game over or victory). The button names today's challenge, for example *Snack Attack on Neon Nightwalk*, and the line under it shows today's twist or your best time today. The Daily Walk is open from the start, even before the trail it remixes is unlocked.
+
+- The walk is built from the **UTC date** with a seeded random number generator (mulberry32), so everyone gets the same walk whatever their time zone, and a new one arrives at midnight UTC.
+- It remixes one of the boss-free Trails 01–06 with fresh scenery and treats moved to new perches. Ground, ledges, spikes, critters, the golden key and the doghouse stay where they are. Each day adds one twist:
+  - **Snack Attack**: half as many treats again, hidden all over the trail.
+  - **Bone Bonanza**: three extra big bone treats that can top you up to five hearts.
+  - **Moonlight Stroll**: a starry night walk.
+  - **Slippery Day**: frosty scenery, ice on the ground and ledges (never next to a gap edge or spike). It only remixes Trails 01–03.
+- Reaching the doghouse ends the walk with your time and **best today**. **Walk again** replays it (or starts the new day's walk after midnight UTC). Daily times don't count toward trail medals, unlocks, or the Kennel.
+- Today's best is saved under its own key, `pup-quest:daily-best`, as `{"date":"YYYY-MM-DD","ms":…}`. A new day starts a fresh record, and a walk begun before midnight never overwrites the next day's record.
+- Tests drive a real-input playthrough of every trail and twist pair the remixer can choose, plus every walk for a full year, and check that every treat sits on solid footing away from spikes and gaps.
+
 ### Secret trail: Frosty Fjord
 
 A hidden bonus trail appears on the Trail Map as a glowing ★ stop after you either **earn a gold paw medal on any trail** or **beat the Mega-Vac on Trail 07**. A toast and screen-reader announcement mark the moment it appears. It is worked out from your saved best times, so no extra save data is needed, and it stays open on that device. Finding it never unlocks campaign trails.
