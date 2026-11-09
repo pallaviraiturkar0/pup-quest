@@ -4,6 +4,7 @@ import { LEVELS, SECRET_INDEX, SECRET_TRAIL, TRAILS } from "./levels.js";
 import { createRenderer } from "./render.js";
 import { themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
+import { commitDailyBest, DAILY_BEST_KEY, dailyChallenge, parseDailyBest, utcDateKey } from "./daily.js";
 import {
   BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_LABELS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes, recordBestTime, recordKeys,
   runMs, spokenTime, withSaveLock,
@@ -82,6 +83,7 @@ let bestTimes = parseBestTimes(savedPreference(BEST_TIMES_KEY), RECORD_KEYS);
 let shownTimer = "";
 let kennel = null;
 let skinId = DEFAULT_SKIN;
+let daily = dailyChallenge();
 const sound = new Sound({ storage: { get: (key) => savedPreference(key), set: (key, value) => savedPreference(key, value) } });
 
 const heartMarkup = (empty) => `<svg class="heart${empty ? " empty" : ""}" viewBox="0 0 16 15" aria-hidden="true"><path d="M2 1h4v2h4V1h4v2h2v5h-2v2h-2v2h-2v2H6v-2H4v-2H2V8H0V3h2Z" fill="currentColor"/></svg>`;
@@ -144,6 +146,7 @@ function unlockAudio() {
 
 function objective() {
   if (game.keyFound) return "KEY FOUND · FIND YOUR WAY HOME";
+  if (game.level.daily) return `DAILY WALK · ${game.level.daily.title.toUpperCase()}`;
   const { boss } = game.level;
   if (boss && !bossDefeated(boss)) {
     if (boss.kind === "yeti") return boss.mode === "sleep" ? "THE GRUMPY YETI GUARDS THE GOLDEN KEY" : "LURE THE YETI ONTO THE ICE, THEN STOMP ITS BELLY";
@@ -184,7 +187,8 @@ function syncOverlay() {
     return;
   }
   clearInput();
-  const run = ["level-complete", "won"].includes(game.status) ? recordClear(game.levelIndex) : null;
+  const walk = game.level.daily;
+  const run = ["level-complete", "won"].includes(game.status) ? walk ? recordDailyClear() : recordClear(game.levelIndex) : null;
   const secret = Boolean(game.level.secret);
   const finaleNext = game.status === "level-complete" && Boolean(LEVELS[game.levelIndex + 1]?.boss);
   const screens = {
@@ -194,7 +198,9 @@ function syncOverlay() {
       ? ["THE FINAL TRAIL AWAITS", "Look at you go!", `${game.level.name}, conquered. One last trail: the Mega-Vac guards the golden key in ${LEVELS[game.levelIndex + 1].name}.`, "Face the Mega-Vac"]
       : ["ONE TRAIL CLOSER TO HOME", "Look at you go!", `${game.level.name}, conquered. A fresh trail and a little extra heart are waiting.`, "Next trail"],
     "game-over": ["EVERY ADVENTURE TAKES PRACTICE", "A little tumble.", "Even the best dogs miss a jump. Shake it off, wag that tail, and give it another go.", "Try again"],
-    won: secret
+    won: walk
+      ? ["DAILY WALK COMPLETE", "Walkies done, good dog!", dailyResultText(walk, run), "Walk again"]
+      : secret
       ? ["SECRET TRAIL CONQUERED", "Brrr-avo, good dog!", `${game.level.name}, conquered! The Grumpy Yeti just needed a belly rub, and now it's your fluffiest friend. Race it again to chase a shinier paw medal.`, "Slide again"]
       : ["CHAMPION OF MOONLIT KEEP", "Victory, very good dog!", "The Mega-Vac is out of power and the golden key is home. Seven trails, a pocket full of treats, and the comfiest nap in the kingdom. Well done, Biscuit.", "Play again"],
   };
@@ -209,28 +215,32 @@ function syncOverlay() {
   $("secondary-button").hidden = game.status !== "paused";
   $("map-button").hidden = !mapAvailable();
   $("kennel-button").hidden = !mapAvailable();
-  $("victory-badge").hidden = game.status !== "won" || secret;
+  $("victory-badge").hidden = game.status !== "won" || secret || Boolean(walk);
+  syncDailyButton();
   $("overlay-hint").textContent = overlayHint();
   // A single cleared trail (including the secret one) shows that trail's treats and time.
-  const single = game.status === "level-complete" || (game.status === "won" && secret);
+  const single = game.status === "level-complete" || (game.status === "won" && (secret || Boolean(walk)));
   const stats = ["level-complete", "game-over", "won"].includes(game.status)
     ? [["TREATS", single ? `${game.levelTreats}/${game.level.treats.length}` : String(game.totalTreats)], ["SCORE", String(game.score)], ["TIME", single ? formatTime(run.ms) : timeLabel(game.elapsed)]]
     : [];
-  if (game.status === "won") stats.push(["TUMBLES", String(game.deaths)]);
+  if (game.status === "won") stats.push(walk ? dailyBestStat(run) : ["TUMBLES", String(game.deaths)]);
   setResultStats(stats);
-  showMedalResult(run);
+  // Daily Walks race today's best instead of a trail's paw medals.
+  showMedalResult(walk ? null : run);
   if (run?.secretRevealed) toast(`A chilly breeze… a secret trail appeared on the Trail Map: ${SECRET_TRAIL.name}!`);
   if (game.status !== "ready") {
-    announce(`${title} ${description}${run ? ` ${medalSpeech(run)}` : ""}${run?.secretRevealed ? ` A secret trail, ${SECRET_TRAIL.name}, appeared on the Trail Map.` : ""}`);
+    announce(`${title} ${description}${run ? ` ${walk ? `Walk time ${spokenTime(run.ms)}.` : medalSpeech(run)}` : ""}${run?.secretRevealed ? ` A secret trail, ${SECRET_TRAIL.name}, appeared on the Trail Map.` : ""}`);
     $("primary-button").focus({ preventScroll: true });
   }
 }
 
 function updateUi() {
+  // A title or results screen left open past midnight UTC switches to the new day's walk.
+  if (daily.date !== utcDateKey()) syncDailyButton();
   const signature = [game.status, game.levelIndex, game.lives, game.levelTreats, game.keyFound, game.score, bossPhase()].join(":");
   if (signature === previousHud) return;
   previousHud = signature;
-  $("level-number").textContent = stopNumber(game.levelIndex);
+  $("level-number").textContent = game.level.daily ? "☀" : stopNumber(game.levelIndex);
   $("level-name").textContent = game.level.name;
   $("treat-count").replaceChildren(document.createTextNode(`${String(game.levelTreats).padStart(2, "0")} `));
   const total = document.createElement("span");
@@ -245,8 +255,8 @@ function updateUi() {
   }
   $("best-score").textContent = String(bestScore).padStart(4, "0");
   document.querySelectorAll("[data-trail]").forEach((trail, index) => {
-    // A secret run is not campaign progress, so show the trails actually cleared on this device.
-    const done = game.level.secret ? index < unlockedTrails - 1 || bestTimes[index] !== null : index < game.levelIndex || game.status === "won";
+    // A secret run or Daily Walk is not campaign progress, so show the trails actually cleared on this device.
+    const done = game.level.secret || game.level.daily ? index < unlockedTrails - 1 || bestTimes[index] !== null : index < game.levelIndex || game.status === "won";
     const current = index === game.levelIndex;
     trail.classList.toggle("active", current);
     if (current) trail.setAttribute("aria-current", "step");
@@ -285,7 +295,9 @@ function processEvents() {
     if (event.type === "hurt" && game.lives > 0) toast(`Whoops! ${game.lives} ${game.lives === 1 ? "heart" : "hearts"} left. You've got this.`);
     if (event.type === "start") {
       $("toast").hidden = true;
-      announce(game.level.secret
+      announce(game.level.daily
+        ? `Daily Walk for ${game.level.daily.date}: ${game.level.daily.title}. ${daily.date === game.level.daily.date ? daily.blurb : ""} Find the golden key and reach the doghouse.`
+        : game.level.secret
         ? `Secret trail: ${game.level.name}. Watch your paws on the shiny blue ice. Find the golden key and reach the doghouse.`
         : `Trail ${game.levelIndex + 1} of ${LEVELS.length}: ${game.level.name}. Find the golden key and reach the doghouse.`);
     }
@@ -298,7 +310,11 @@ function primaryAction() {
   if (game.status === "ready") startGame(game);
   else if (game.status === "paused") resumeGame(game);
   else if (game.status === "level-complete") nextLevel(game);
-  else if (game.status === "won") restartGame(game, game.level.secret ? SECRET_INDEX : 0);
+  else if (game.status === "won" && game.level.daily) {
+    // Walking again after midnight UTC starts the new day's walk.
+    startDailyWalk();
+    return;
+  } else if (game.status === "won") restartGame(game, game.level.secret ? SECRET_INDEX : 0);
   else if (game.status === "game-over") restartGame(game);
   renderer.clearEffects();
   processEvents();
@@ -342,6 +358,70 @@ function recordClear(index) {
   return { index, ms, best: result.best, newBest: result.newBest, medal: medalFor(ms, par), next: nextMedal(ms, par), secretRevealed };
 }
 
+// Daily Walk: one remixed trail per UTC day. Its best time is kept apart from the trail medals.
+function todaysWalk() {
+  if (daily.date !== utcDateKey()) daily = dailyChallenge();
+  return daily;
+}
+
+function syncDailyButton() {
+  const walk = todaysWalk();
+  const best = parseDailyBest(savedPreference(DAILY_BEST_KEY), walk.date);
+  $("daily-button").textContent = `Daily walk: ${walk.title}`;
+  $("daily-button").setAttribute("aria-label", `Daily walk for today: ${walk.title}. ${walk.blurb}${best === null ? "" : ` Your best today is ${spokenTime(best)}.`}`);
+  $("daily-best").textContent = best === null ? `☀ ${walk.blurb}` : `☀ BEST TODAY ${formatTime(best)}`;
+  $("daily-button").hidden = !mapAvailable();
+  $("daily-best").hidden = !mapAvailable();
+}
+
+function startDailyWalk() {
+  if (!mapAvailable()) return;
+  unlockAudio();
+  clearInput();
+  const walk = todaysWalk();
+  Object.assign(game, createGame(walk.trail, { level: walk.level }));
+  startGame(game);
+  renderer.clearEffects();
+  processEvents();
+  updateUi();
+  focusGame();
+}
+
+function dailyResultText(walk, run) {
+  const best = run?.newBest ? "That's your best time today." : run?.best ? `Today's best is ${formatTime(run.best)}.` : "";
+  return `${walk.title}, conquered! ${best} A brand-new walk arrives at midnight UTC.`;
+}
+
+const dailyBestStat = (run) => ["BEST TODAY", formatTime(run.best ?? run.ms)];
+
+// Saves the walk's time when it beats today's best, re-reading under the lock so tabs never drop a faster run.
+// If another tab saved a faster time first, the results screen (if this run's is still showing) is corrected.
+let shownDailyRun = null;
+function recordDailyClear() {
+  const ms = runMs(game.levelTime);
+  const { date } = game.level.daily;
+  const result = commitDailyBest(ms, savedPreference(DAILY_BEST_KEY), date);
+  const run = { ms, best: result.best, newBest: result.newBest };
+  shownDailyRun = run;
+  if (result.raw) {
+    withSaveLock(navigator.locks, `pup-quest:${DAILY_BEST_KEY}`, () => {
+      const commit = commitDailyBest(ms, savedPreference(DAILY_BEST_KEY), date);
+      if (commit.raw) savedPreference(DAILY_BEST_KEY, commit.raw);
+      return commit;
+    }).then((commit) => {
+      syncDailyButton();
+      if (commit.best === run.best && commit.newBest === run.newBest) return;
+      Object.assign(run, { best: commit.best, newBest: commit.newBest });
+      if (shownDailyRun !== run || game.status !== "won" || !game.level.daily) return;
+      $("overlay-description").textContent = dailyResultText(game.level.daily, run);
+      const stats = $("result-stats").lastElementChild;
+      if (stats) stats.firstElementChild.textContent = dailyBestStat(run)[1];
+      announce(`Another tab saved a faster walk. Today's best is ${spokenTime(run.best)}.`);
+    }).catch((error) => console.warn("Pup Quest could not save a Daily Walk time:", error));
+  }
+  return run;
+}
+
 // Re-read and merge under a cross-tab lock so two tabs saving at once can't drop each other's records.
 function saveBestTimes() {
   withSaveLock(navigator.locks, `pup-quest:${BEST_TIMES_KEY}`, () => {
@@ -353,6 +433,7 @@ function saveBestTimes() {
 
 window.addEventListener("storage", (event) => {
   // A null key means another tab cleared all of storage.
+  if (event.key === `pup-quest:${DAILY_BEST_KEY}` || event.key === null) syncDailyButton();
   if (event.key !== null && ![`pup-quest:${BEST_TIMES_KEY}`, `pup-quest:${SKIN_KEY}`].includes(event.key)) return;
   latestBestTimes();
   applySavedSkin();
@@ -582,6 +663,7 @@ window.addEventListener("keydown", (event) => {
   }
 });
 $("map-button").addEventListener("click", openTrailMap);
+$("daily-button").addEventListener("click", startDailyWalk);
 $("trail-map-back").addEventListener("click", () => closeTrailMap());
 $("trail-map-kennel").addEventListener("click", () => {
   closeTrailMap({ restoreFocus: false });

@@ -32,7 +32,8 @@ function playerAt(x, y) {
 }
 
 function loadLevel(game) {
-  game.level = structuredClone(TRAILS[game.levelIndex]);
+  // A custom level (the Daily Walk's remix) replaces the trail at `levelIndex`.
+  game.level = structuredClone(game.custom ?? TRAILS[game.levelIndex]);
   game.player = playerAt(game.level.start.x, game.level.start.y);
   game.cameraX = 0;
   game.keyFound = false;
@@ -41,11 +42,11 @@ function loadLevel(game) {
   game.exitHintCooldown = 0;
 }
 
-export function createGame(startIndex = 0) {
+export function createGame(startIndex = 0, { level = null } = {}) {
   const first = Number.isInteger(startIndex) && startIndex >= 0 && startIndex < TRAILS.length ? startIndex : 0;
   const game = {
     status: "ready", levelIndex: first, startIndex: first, lives: 3, score: 0, totalTreats: 0,
-    elapsed: 0, events: [], deaths: 0,
+    elapsed: 0, events: [], deaths: 0, custom: level,
   };
   loadLevel(game);
   return game;
@@ -59,8 +60,9 @@ export function startGame(game) {
 }
 
 // Restarts from the trail this run began on (picked on the Trail Map), or from trail 01.
+// A custom run (the Daily Walk) restarts the same custom level.
 export function restartGame(game, startIndex = game.startIndex ?? 0) {
-  Object.assign(game, createGame(startIndex));
+  Object.assign(game, createGame(startIndex, { level: game.custom ?? null }));
   startGame(game);
 }
 
@@ -253,8 +255,8 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   if (intersects(p, level.exit)) {
     if (game.keyFound) {
       game.score += game.lives * 50;
-      // The finale and the secret trail both end the run; other trails lead on to the next.
-      game.status = level.secret || game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
+      // The finale, the secret trail and a Daily Walk all end the run; other trails lead on to the next.
+      game.status = level.secret || level.daily || game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
       game.events.push({ type: game.status, x: level.exit.x + level.exit.w / 2, y: level.exit.y });
     } else if (game.exitHintCooldown === 0) {
       game.exitHintCooldown = 3;
