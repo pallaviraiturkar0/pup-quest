@@ -1041,6 +1041,8 @@ $("builder-grid").addEventListener("pointerdown", (event) => {
   builderPointer = event.pointerType;
   const spot = cellFromEvent(event);
   if (!builder || !spot || event.button !== 0 || event.pointerType === "touch") return;
+  // Pens get implicit pointer capture, which stops pointerover firing on the other cells.
+  if (event.target.hasPointerCapture?.(event.pointerId)) event.target.releasePointerCapture(event.pointerId);
   builder.painting = true;
   paintBuilderCell(...spot);
 });
@@ -1067,6 +1069,18 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     event.preventDefault();
     closeBuilder();
+    return;
+  }
+  if (event.key === "Tab") {
+    // Keep focus inside the dialog: wrap between its first and last visible controls.
+    const stops = [...$("builder").querySelectorAll("button, select, input")].filter((control) => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length > 0);
+    const first = stops[0];
+    const last = stops.at(-1);
+    const inside = $("builder").contains(document.activeElement);
+    if (!inside || document.activeElement === (event.shiftKey ? first : last)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first)?.focus({ preventScroll: true });
+    }
     return;
   }
   const typing = event.target instanceof Element && event.target.closest("input, select");
