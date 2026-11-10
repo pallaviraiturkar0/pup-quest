@@ -141,6 +141,32 @@ A better medal counts for the lower ones (a gold also counts as a silver and a b
 
 The chosen pup is saved under `pup-quest:skin`. A missing, unknown, or still-locked choice falls back to Biscuit.
 
+### Trail Builder and share codes
+
+Build your own trail and send it to a friend. Pick **Trail builder: make & share** on the title screen (or after a game over or victory) to open a 40 x 9 tile grid. The bottom row is the ground and the eight rows above it are open sky.
+
+| Tool | Key | What it places |
+| --- | --- | --- |
+| Ground | 1 | Solid ground (bottom row) |
+| Ledge | 2 | A platform tile (rows above the ground) |
+| Spikes | 3 | A spike pit (bottom row only) |
+| Treat | 4 | A treat to collect (rows above the ground) |
+| Doghouse | 5 | Moves the goal to that column and lays plain ground under it |
+| Erase | 6 | Clears a tile; on the bottom row it digs a gap to jump over |
+
+The first six columns (the start) and the ground under the doghouse always stay plain ground; the builder explains why if you try to change them.
+
+- **Keyboard:** the arrow keys (or Home/End) move the cursor, Enter or Space places the current tool, Delete or Backspace erases, 1–6 pick a tool, Tab reaches the buttons, and Esc goes back. Screen readers hear each tile's position and contents.
+- **Mouse and touch:** pick a tool, then click or tap tiles. With a mouse or pen you can also drag to paint; on touch screens dragging scrolls the grid instead. On phones the builder fills the screen.
+- **Play-test** runs your trail straight away in the chosen theme (any of the eight game themes). Reach the doghouse to clear it; your pup starts with the doghouse open, there is no key to find, and no checkpoint.
+- **Share code** shows a link such as `https://pallaviraiturkar0.github.io/pup-quest/?trail=<code>` with a **Copy** button. Opening that link shows "Someone built you a trail!" and plays it; the title-screen button then reads **Trail builder: remix this trail**, which opens that trail for editing.
+- **Example** loads a ready-made trail to remix, and **Clear** starts over with plain ground. Your work in progress is kept on this device under `pup-quest:builder-draft`.
+- Built and shared trails are just for fun: they never change your unlocks, best times, medals, Daily Walk record, or Kennel progress.
+
+Try the built-in example: [play the example trail](https://pallaviraiturkar0.github.io/pup-quest/?trail=AQQoIwAAQAAQAAQAAQAAQAAQAAQACQACQAAQAQQCQACQAAQQAAQAAQAAQAAQAIgAAQAAQAAQAAQAEQAkAAkAAkAAEQAAQACQAAQAAQAIgAAQACQAAQAAQAAQAAQAAW7u).
+
+**Share-code format (version 1).** A code is unpadded base64url (only `A–Z a–z 0–9 - _`, so it is safe in a URL) of these bytes: format version, theme index, trail length in columns (30–80), doghouse column, then 2 bits per tile column by column from the top row down, and finally a Fletcher-16 checksum. Codes are checked strictly before anything is loaded: the length, characters, version, theme, size, every tile value, zeroed padding bits, and the checksum must all be valid, the first six columns must be plain ground, the doghouse must sit on plain ground, and a trail can hold at most 60 treats. If a code is broken or tampered with, the game never crashes. It shows a friendly message (for example "That trail code has a typo somewhere") and starts the regular adventure instead.
+
 Your personal best, unlocked trails, best trail times, chosen pup, and sound preference are saved on your device using local storage, when available. A reload starts a new adventure; checkpoints only last for the current run.
 
 ## Run locally
@@ -163,7 +189,7 @@ To lint, install the development tooling once with `npm ci` (the game itself has
 npm run lint
 ```
 
-The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Time-trial tests cover the pause-aware trail timer, medal thresholds, best-time parsing and saving, keeping the faster time from another tab (including overlapping saves under the lock), time formatting, and medal art contrast. Kennel tests cover skin data validity (palettes, ears, tails, markings, and unlock rules), every coat drawing inside the sprite box, medal-based unlock rules and progress, requirement wording, picking only unlocked pups, and falling back to Biscuit for missing, corrupt, unknown, or locked saves. Secret-trail tests cover its unlock rules (gold paw or boss clear only), the extra map stop, ice traction, slide length and air control, ice fairness, the arctic theme's aurora, snow, and ice drawing, and a real-input run that wins it with gold. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
+The built-in Node test runner covers movement, variable jumps, coyote time, jump buffering, collisions, pickups, checkpoints, lives, pause/restart, and campaign state transitions, plus each critter's movement, tells, collisions, and drawing, and each power-up's pickup, effect, timeout, and drawing. Touch tests cover paw hit-testing, multi-touch, sliding between paws, jump-press queuing, touch-device detection, driving the engine from touch input, and the procedural paw art. Audio tests drive a fake AudioContext to check every sound recipe, gesture-only start, mute persistence, and silent failure; particle tests cover the capped pool, recycling, event bursts, reduced motion, landing events, and drawing. Boss tests cover the Mega-Vac's state machine (nap, roam, wind-up, charge, dizzy, hurt, defeated), stomp rules, respawn reset, arena fairness, the locked key and doghouse, and drawing every mode. A full-campaign input replay also checks that all seven trails, including the boss fight, can be completed without losing a heart, using ordinary movement and jumps. Trail Map tests cover unlock parsing and persistence rules, keyboard selection, refusing locked trails, starting (and restarting) a game at a chosen trail, the path staying in bounds, and readable stop colours. Time-trial tests cover the pause-aware trail timer, medal thresholds, best-time parsing and saving, keeping the faster time from another tab (including overlapping saves under the lock), time formatting, and medal art contrast. Kennel tests cover skin data validity (palettes, ears, tails, markings, and unlock rules), every coat drawing inside the sprite box, medal-based unlock rules and progress, requirement wording, picking only unlocked pups, and falling back to Biscuit for missing, corrupt, unknown, or locked saves. Secret-trail tests cover its unlock rules (gold paw or boss clear only), the extra map stop, ice traction, slide length and air control, ice fairness, the arctic theme's aurora, snow, and ice drawing, and a real-input run that wins it with gold. Trail Builder tests cover share-code round-trips for random trails and for every theme at the shortest and longest sizes, rejecting malformed, truncated, oversized, tampered, and fuzzed codes (and hand-built codes with bad versions, themes, sizes, tiles, padding, starts, doghouses, or too many treats) without throwing, `?trail=` parsing and share links, the tool placement rules, and loading a code into a level that a real-input run clears without losing a heart. Level-data tests check every trail's bounds, themes, spawn point, hazard placement, and run a static jump-reachability check from the start to every platform, power-up, the golden key, and the doghouse.
 
 ## How it works
 
@@ -180,8 +206,9 @@ The built-in Node test runner covers movement, variable jumps, coyote time, jump
 - `src/medals.js`: DOM-free time-trial logic: medals from par times, best-time storage and merging, time formatting, and the medal art.
 - `src/trailmap.js`: DOM-free Trail Map logic: reading and advancing unlock progress, keyboard selection, locked-trail rules, the secret-trail unlock, the seeded winding path, and per-theme stop colours.
 - `src/kennel.js`: DOM-free Dog Kennel logic: pup skin data, medal-based unlock rules, saved-skin fallback, and the shared procedural pup sprite used by gameplay and the Kennel previews.
+- `src/trailcode.js`: DOM-free Trail Builder logic: the versioned share-code format (encode, strict decode and validation), builder tool rules, `?trail=` parsing and share links, the example trail, and turning a built trail into a playable level.
 - `src/touch.js`: touch-to-action logic (pointer tracking, paw hit-testing, touch-device detection) and the procedural paw-print button art, kept DOM-free so it runs under node tests.
-- `src/main.js`: keyboard controls, wiring for the touch paws, menus, the Trail Map and Dog Kennel, accessibility announcements, and saved scores.
+- `src/main.js`: keyboard controls, wiring for the touch paws, menus, the Trail Map, Dog Kennel, and Trail Builder, accessibility announcements, and saved scores.
 - `styles.css`: responsive game page and touch layouts, with reduced-motion and fullscreen support.
 
 No frameworks, downloaded assets, trackers, analytics, external fonts, backend, or paid services.

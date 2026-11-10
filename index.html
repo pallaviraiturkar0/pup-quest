@@ -63,7 +63,7 @@
               <div id="medal-result" class="medal-result" hidden><span id="medal-icon" class="medal-icon"></span><span class="medal-text"><strong id="medal-name"></strong><span id="medal-detail"></span></span><span id="new-best" class="new-best-badge" hidden>New best!</span></div>
               <button id="primary-button" class="primary-button" type="button">Let's play <span aria-hidden="true">→</span></button>
               <button id="secondary-button" class="secondary-button" type="button" hidden>Restart adventure</button>
-              <div class="overlay-links"><button id="map-button" class="secondary-button map-button" type="button">Trail map: pick a trail</button><button id="kennel-button" class="secondary-button kennel-button" type="button">Dog kennel: pick a pup</button><button id="daily-button" class="secondary-button daily-button" type="button">Daily walk</button></div>
+              <div class="overlay-links"><button id="map-button" class="secondary-button map-button" type="button">Trail map: pick a trail</button><button id="kennel-button" class="secondary-button kennel-button" type="button">Dog kennel: pick a pup</button><button id="daily-button" class="secondary-button daily-button" type="button">Daily walk</button><button id="builder-button" class="secondary-button builder-button" type="button">Trail builder: make &amp; share</button></div>
               <span id="daily-best" class="daily-best" aria-hidden="true"></span>
               <span id="overlay-hint" class="overlay-hint">ARROWS TO MOVE <span>·</span> SPACE TO JUMP</span>
             </div>
@@ -86,6 +86,22 @@
             </div>
             <div id="kennel-skins" class="kennel-skins" role="radiogroup" aria-label="Pups"></div>
             <p id="kennel-hint" class="trail-map-hint">Earn paw medals in time trials to unlock pups. ARROWS TO CHOOSE · ENTER TO PICK · ESC TO GO BACK</p>
+          </div>
+          <div id="builder" class="trail-map builder" role="dialog" aria-modal="true" aria-labelledby="builder-title" aria-describedby="builder-hint" hidden>
+            <div class="trail-map-header">
+              <div><h2 id="builder-title">Trail builder</h2><p id="builder-status" class="trail-map-status" aria-hidden="true"></p></div>
+              <div class="trail-map-actions"><label class="builder-theme">Theme <select id="builder-theme"></select></label><button id="builder-back" class="trail-map-back" type="button">Back <kbd>esc</kbd></button></div>
+            </div>
+            <div id="builder-tools" class="builder-tools" role="group" aria-label="Tools"></div>
+            <div class="builder-scroll"><div id="builder-grid" class="builder-grid" role="grid" aria-label="Trail grid. The bottom row is the ground."></div></div>
+            <div class="builder-actions">
+              <button id="builder-play" class="trail-map-back builder-play" type="button">Play-test</button>
+              <button id="builder-share" class="trail-map-back" type="button">Share code</button>
+              <button id="builder-example" class="trail-map-back" type="button">Example</button>
+              <button id="builder-clear" class="trail-map-back" type="button">Clear</button>
+            </div>
+            <div id="builder-share-box" class="builder-share" hidden><input id="builder-share-url" type="text" readonly aria-label="Share link for your trail"><button id="builder-copy" class="trail-map-back" type="button">Copy</button></div>
+            <p id="builder-hint" class="trail-map-hint">ARROWS MOVE · ENTER PLACES · DELETE ERASES · 1–6 PICK A TOOL · ESC TO GO BACK</p>
           </div>
           <noscript><div class="noscript">Pup Quest needs JavaScript to play. Enable it in your browser and reload.</div></noscript>
         </div>
