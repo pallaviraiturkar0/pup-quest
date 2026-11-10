@@ -32,11 +32,12 @@ function playerAt(x, y) {
 }
 
 function loadLevel(game) {
-  // A custom level (the Daily Walk's remix) replaces the trail at `levelIndex`.
+  // A custom level (the Daily Walk's remix or a built trail) replaces the trail at `levelIndex`.
   game.level = structuredClone(game.custom ?? TRAILS[game.levelIndex]);
   game.player = playerAt(game.level.start.x, game.level.start.y);
   game.cameraX = 0;
-  game.keyFound = false;
+  // A built trail has no key to find: its doghouse is open from the start.
+  game.keyFound = Boolean(game.level.built);
   game.levelTreats = 0;
   game.levelTime = 0;
   game.exitHintCooldown = 0;
@@ -255,8 +256,8 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   if (intersects(p, level.exit)) {
     if (game.keyFound) {
       game.score += game.lives * 50;
-      // The finale, the secret trail and a Daily Walk all end the run; other trails lead on to the next.
-      game.status = level.secret || level.daily || game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
+      // The finale, the secret trail, a Daily Walk and a built trail all end the run; other trails lead on to the next.
+      game.status = level.secret || level.daily || level.built || game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
       game.events.push({ type: game.status, x: level.exit.x + level.exit.w / 2, y: level.exit.y });
     } else if (game.exitHintCooldown === 0) {
       game.exitHintCooldown = 3;

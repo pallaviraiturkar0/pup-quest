@@ -2,7 +2,7 @@ import { bossDefeated } from "./boss.js";
 import { createGame, nextLevel, pauseGame, restartGame, resumeGame, startGame, stepGame } from "./engine.js";
 import { LEVELS, SECRET_INDEX, SECRET_TRAIL, TRAILS } from "./levels.js";
 import { createRenderer } from "./render.js";
-import { themeOverrideFromSearch } from "./themes.js";
+import { THEMES, themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
 import { commitDailyBest, DAILY_BEST_KEY, dailyChallenge, parseDailyBest, utcDateKey } from "./daily.js";
 import {
@@ -17,6 +17,10 @@ import {
   chooseSkin, DEFAULT_SKIN, drawPup, getSkin, moveSkinFocus, requirementText, resolveSkin, SKIN_KEY, SKINS, skinProgress, SPRITE_HEIGHT,
   SPRITE_WIDTH, unlockedSkinIds,
 } from "./kennel.js";
+import {
+  BUILDER_THEMES, CELL, decodeTrail, emptyTrail, encodeTrail, exampleTrail, GROUND, GROUND_ROW, paintCell, ROWS, shareUrl, TOOL_LABELS, TOOLS,
+  trailFromSearch, trailToLevel, treatCount,
+} from "./trailcode.js";
 import {
   actionAt, clearTouches, createTouchState, pawPrintSvg, pointerDown, pointerMove, pointerUp,
   shouldShowTouchControls, touchInput,
@@ -84,6 +88,7 @@ let shownTimer = "";
 let kennel = null;
 let skinId = DEFAULT_SKIN;
 let daily = dailyChallenge();
+let builder = null;
 const sound = new Sound({ storage: { get: (key) => savedPreference(key), set: (key, value) => savedPreference(key, value) } });
 
 const heartMarkup = (empty) => `<svg class="heart${empty ? " empty" : ""}" viewBox="0 0 16 15" aria-hidden="true"><path d="M2 1h4v2h4V1h4v2h2v5h-2v2h-2v2h-2v2H6v-2H4v-2H2V8H0V3h2Z" fill="currentColor"/></svg>`;
@@ -145,6 +150,7 @@ function unlockAudio() {
 }
 
 function objective() {
+  if (game.level.built) return `${game.level.name.toUpperCase()} · REACH THE DOGHOUSE`;
   if (game.keyFound) return "KEY FOUND · FIND YOUR WAY HOME";
   if (game.level.daily) return `DAILY WALK · ${game.level.daily.title.toUpperCase()}`;
   const { boss } = game.level;
@@ -188,17 +194,25 @@ function syncOverlay() {
   }
   clearInput();
   const walk = game.level.daily;
-  const run = ["level-complete", "won"].includes(game.status) ? walk ? recordDailyClear() : recordClear(game.levelIndex) : null;
+  const built = game.level.built;
+  // Built trails are just for fun: their times are shown but never saved.
+  const run = ["level-complete", "won"].includes(game.status) ? built ? { ms: runMs(game.levelTime) } : walk ? recordDailyClear() : recordClear(game.levelIndex) : null;
   const secret = Boolean(game.level.secret);
   const finaleNext = game.status === "level-complete" && Boolean(LEVELS[game.levelIndex + 1]?.boss);
   const screens = {
-    ready: ["HELLO, ADVENTURER", "Ready, player woof?", "The world's a little bigger from down here. Grab some treats. Find the key. Head home.", "Let's play"],
+    ready: built?.shared
+      ? ["A TRAIL MADE FOR YOU", "Someone built you a trail!", "A fellow pup lover made this trail and shared its code. Grab the treats and reach the doghouse.", "Let's play"]
+      : ["HELLO, ADVENTURER", "Ready, player woof?", "The world's a little bigger from down here. Grab some treats. Find the key. Head home.", "Let's play"],
     paused: ["TAKE A LITTLE BREATHER", "Paws for a moment.", "Your adventure will be right here. Good dogs need snack breaks, too.", "Keep exploring"],
     "level-complete": finaleNext
       ? ["THE FINAL TRAIL AWAITS", "Look at you go!", `${game.level.name}, conquered. One last trail: the Mega-Vac guards the golden key in ${LEVELS[game.levelIndex + 1].name}.`, "Face the Mega-Vac"]
       : ["ONE TRAIL CLOSER TO HOME", "Look at you go!", `${game.level.name}, conquered. A fresh trail and a little extra heart are waiting.`, "Next trail"],
     "game-over": ["EVERY ADVENTURE TAKES PRACTICE", "A little tumble.", "Even the best dogs miss a jump. Shake it off, wag that tail, and give it another go.", "Try again"],
-    won: walk
+    won: built
+      ? [built.shared ? "SHARED TRAIL CLEARED" : "PLAY-TEST PASSED", "Trail cleared, good dog!", built.shared
+        ? "You made it home! Open the Trail builder to remix this trail and share your own version."
+        : "Your trail works! Open the Trail builder to tweak it or copy its share code.", "Play again"]
+      : walk
       ? ["DAILY WALK COMPLETE", "Walkies done, good dog!", dailyResultText(walk, run), "Walk again"]
       : secret
       ? ["SECRET TRAIL CONQUERED", "Brrr-avo, good dog!", `${game.level.name}, conquered! The Grumpy Yeti just needed a belly rub, and now it's your fluffiest friend. Race it again to chase a shinier paw medal.`, "Slide again"]
@@ -215,21 +229,22 @@ function syncOverlay() {
   $("secondary-button").hidden = game.status !== "paused";
   $("map-button").hidden = !mapAvailable();
   $("kennel-button").hidden = !mapAvailable();
-  $("victory-badge").hidden = game.status !== "won" || secret || Boolean(walk);
+  $("victory-badge").hidden = game.status !== "won" || secret || Boolean(walk) || Boolean(built);
   syncDailyButton();
+  syncBuilderButton();
   $("overlay-hint").textContent = overlayHint();
   // A single cleared trail (including the secret one) shows that trail's treats and time.
-  const single = game.status === "level-complete" || (game.status === "won" && (secret || Boolean(walk)));
+  const single = game.status === "level-complete" || (game.status === "won" && (secret || Boolean(walk) || Boolean(built)));
   const stats = ["level-complete", "game-over", "won"].includes(game.status)
     ? [["TREATS", single ? `${game.levelTreats}/${game.level.treats.length}` : String(game.totalTreats)], ["SCORE", String(game.score)], ["TIME", single ? formatTime(run.ms) : timeLabel(game.elapsed)]]
     : [];
   if (game.status === "won") stats.push(walk ? dailyBestStat(run) : ["TUMBLES", String(game.deaths)]);
   setResultStats(stats);
-  // Daily Walks race today's best instead of a trail's paw medals.
-  showMedalResult(walk ? null : run);
+  // Daily Walks race today's best instead of a trail's paw medals, and built trails have no medals.
+  showMedalResult(walk || built ? null : run);
   if (run?.secretRevealed) toast(`A chilly breeze… a secret trail appeared on the Trail Map: ${SECRET_TRAIL.name}!`);
   if (game.status !== "ready") {
-    announce(`${title} ${description}${run ? ` ${walk ? `Walk time ${spokenTime(run.ms)}.` : medalSpeech(run)}` : ""}${run?.secretRevealed ? ` A secret trail, ${SECRET_TRAIL.name}, appeared on the Trail Map.` : ""}`);
+    announce(`${title} ${description}${run ? ` ${walk ? `Walk time ${spokenTime(run.ms)}.` : built ? `Trail time ${spokenTime(run.ms)}.` : medalSpeech(run)}` : ""}${run?.secretRevealed ? ` A secret trail, ${SECRET_TRAIL.name}, appeared on the Trail Map.` : ""}`);
     $("primary-button").focus({ preventScroll: true });
   }
 }
@@ -240,7 +255,7 @@ function updateUi() {
   const signature = [game.status, game.levelIndex, game.lives, game.levelTreats, game.keyFound, game.score, bossPhase()].join(":");
   if (signature === previousHud) return;
   previousHud = signature;
-  $("level-number").textContent = game.level.daily ? "☀" : stopNumber(game.levelIndex);
+  $("level-number").textContent = game.level.built ? "✎" : game.level.daily ? "☀" : stopNumber(game.levelIndex);
   $("level-name").textContent = game.level.name;
   $("treat-count").replaceChildren(document.createTextNode(`${String(game.levelTreats).padStart(2, "0")} `));
   const total = document.createElement("span");
@@ -249,15 +264,17 @@ function updateUi() {
   $("lives").innerHTML = Array.from({ length: Math.max(3, game.lives) }, (_, index) => heartMarkup(index >= game.lives)).join("");
   $("lives").setAttribute("aria-label", `${game.lives} ${game.lives === 1 ? "life" : "lives"} remaining`);
   if (game.status === "playing") $("objective").textContent = objective();
-  if (game.score > bestScore) {
+  // Built and shared trails are just for fun and never change the saved personal best.
+  if (!game.level.built && game.score > bestScore) {
     bestScore = game.score;
     savedPreference("best", String(bestScore));
   }
   $("best-score").textContent = String(bestScore).padStart(4, "0");
   document.querySelectorAll("[data-trail]").forEach((trail, index) => {
     // A secret run or Daily Walk is not campaign progress, so show the trails actually cleared on this device.
-    const done = game.level.secret || game.level.daily ? index < unlockedTrails - 1 || bestTimes[index] !== null : index < game.levelIndex || game.status === "won";
-    const current = index === game.levelIndex;
+    const offCampaign = game.level.secret || game.level.daily || game.level.built;
+    const done = offCampaign ? index < unlockedTrails - 1 || bestTimes[index] !== null : index < game.levelIndex || game.status === "won";
+    const current = !game.level.built && index === game.levelIndex;
     trail.classList.toggle("active", current);
     if (current) trail.setAttribute("aria-current", "step");
     else trail.removeAttribute("aria-current");
@@ -295,7 +312,9 @@ function processEvents() {
     if (event.type === "hurt" && game.lives > 0) toast(`Whoops! ${game.lives} ${game.lives === 1 ? "heart" : "hearts"} left. You've got this.`);
     if (event.type === "start") {
       $("toast").hidden = true;
-      announce(game.level.daily
+      announce(game.level.built
+        ? `${game.level.name}. Reach the doghouse. Treats are optional.`
+        : game.level.daily
         ? `Daily Walk for ${game.level.daily.date}: ${game.level.daily.title}. ${daily.date === game.level.daily.date ? daily.blurb : ""} Find the golden key and reach the doghouse.`
         : game.level.secret
         ? `Secret trail: ${game.level.name}. Watch your paws on the shiny blue ice. Find the golden key and reach the doghouse.`
@@ -838,6 +857,314 @@ $("kennel-back").addEventListener("click", () => closeKennel());
 buildKennel();
 applySavedSkin();
 
+// Trail Builder: paint a small grid, play-test it, and share it as a `?trail=` code.
+const BUILDER_DRAFT_KEY = "builder-draft";
+const ROW_NAMES = Array.from({ length: ROWS }, (_, row) => row === GROUND_ROW ? "ground" : `height ${GROUND_ROW - row}`);
+let builderCells = [];
+// The trail being edited, kept across closing and reopening the builder. `seed` is the played code it came from.
+let builderWork = null;
+
+function cellContent(trail, column, row) {
+  if (row === GROUND_ROW) {
+    const ground = trail.cells[row][column];
+    const base = ground === GROUND.GAP ? "water" : ground === GROUND.SPIKE ? "spikes" : "ground";
+    return column === trail.goal || column === trail.goal + 1 ? `${base}, doghouse` : column === 3 ? `${base}, Biscuit starts here` : base;
+  }
+  return { [CELL.EMPTY]: "empty", [CELL.PLATFORM]: "ledge", [CELL.TREAT]: "treat" }[trail.cells[row][column]];
+}
+
+function buildBuilderGrid(columns) {
+  if (builderCells.length === ROWS && builderCells[0].length === columns) return;
+  const grid = $("builder-grid");
+  grid.style.setProperty("--columns", String(columns));
+  builderCells = [];
+  grid.replaceChildren(...Array.from({ length: ROWS }, (_, row) => {
+    const line = document.createElement("div");
+    line.setAttribute("role", "row");
+    line.className = "builder-row";
+    builderCells.push(Array.from({ length: columns }, (_, column) => {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "builder-cell";
+      cell.setAttribute("role", "gridcell");
+      cell.dataset.column = String(column);
+      cell.dataset.row = String(row);
+      line.append(cell);
+      return cell;
+    }));
+    return line;
+  }));
+}
+
+function syncBuilder() {
+  builder.column = Math.min(builder.column, builder.trail.columns - 1);
+  const { trail, column: focusColumn, row: focusRow, tool } = builder;
+  buildBuilderGrid(trail.columns);
+  builderCells.forEach((cells, row) => cells.forEach((cell, column) => {
+    const value = trail.cells[row][column];
+    const ground = row === GROUND_ROW;
+    cell.className = `builder-cell ${ground ? ["gap", "ground", "spike"][value] : ["empty", "ledge", "treat"][value]}`;
+    if (ground && column === 3) cell.classList.add("start");
+    if (row === GROUND_ROW - 1 && (column === trail.goal || column === trail.goal + 1)) cell.classList.add(column === trail.goal ? "goal" : "goal-end");
+    const focused = column === focusColumn && row === focusRow;
+    cell.classList.toggle("focused", focused);
+    cell.tabIndex = focused ? 0 : -1;
+    cell.setAttribute("aria-label", `Column ${column + 1}, ${ROW_NAMES[row]}: ${cellContent(trail, column, row)}`);
+  }));
+  for (const button of $("builder-tools").querySelectorAll("[data-tool]")) button.setAttribute("aria-pressed", String(button.dataset.tool === tool));
+  $("builder-theme").value = trail.theme;
+  $("builder-status").textContent = `${trail.columns} TILES · ${treatCount(trail)} TREATS · ${THEMES[trail.theme].label.toUpperCase()} · TOOL ${TOOL_LABELS[tool].toUpperCase()}`;
+}
+
+function focusBuilderCell({ scroll = true } = {}) {
+  const cell = builderCells[builder.row]?.[builder.column];
+  if (!cell) return;
+  cell.focus({ preventScroll: true });
+  if (scroll) cell.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function builderChanged() {
+  $("builder-share-box").hidden = true;
+  savedPreference(BUILDER_DRAFT_KEY, encodeTrail(builder.trail));
+  syncBuilder();
+}
+
+function paintBuilderCell(column, row, tool = builder.tool) {
+  const { changed, message } = paintCell(builder.trail, tool, column, row);
+  builder.column = column;
+  builder.row = row;
+  if (message) {
+    toast(message);
+    announce(message);
+  }
+  if (changed) {
+    builderChanged();
+    announce(`${cellContent(builder.trail, column, row)}.`);
+  } else syncBuilder();
+  return changed;
+}
+
+function pickBuilderTool(tool) {
+  builder.tool = tool;
+  syncBuilder();
+  announce(`${TOOL_LABELS[tool]} tool.`);
+}
+
+function savedDraft() {
+  const raw = savedPreference(BUILDER_DRAFT_KEY);
+  return raw ? decodeTrail(raw).trail ?? null : null;
+}
+
+function syncBuilderButton() {
+  $("builder-button").textContent = game.level.built?.shared ? "Trail builder: remix this trail" : "Trail builder: make & share";
+  $("builder-button").hidden = !mapAvailable();
+}
+
+function openBuilder() {
+  if (!mapAvailable()) return;
+  clearInput();
+  // A newly played built or shared trail opens for editing; otherwise keep editing the last
+  // trail (or the saved draft, or a fresh trail).
+  const seed = game.level.built?.code ?? null;
+  if (seed && seed !== builderWork?.seed) {
+    const played = decodeTrail(seed).trail;
+    if (played) builderWork = { seed, trail: played, tool: builderWork?.tool };
+  }
+  builderWork ??= { seed: null, trail: savedDraft() ?? emptyTrail() };
+  const { trail } = builderWork;
+  builder = { trail, column: 3, row: GROUND_ROW - 1, tool: builderWork.tool ?? "platform", painting: false };
+  $("builder-share-box").hidden = true;
+  syncBuilder();
+  $("builder").hidden = false;
+  setBackgroundInert(true, $("builder"));
+  focusBuilderCell();
+  announce(`Trail builder. ${trail.columns} columns. Use the arrow keys to move, Enter to place a ${TOOL_LABELS[builder.tool]}, Delete to erase, and the number keys 1 to ${TOOLS.length} to pick a tool.`);
+}
+
+function closeBuilder({ restoreFocus = true } = {}) {
+  if (!builder) return;
+  builderWork = { ...builderWork, trail: builder.trail, tool: builder.tool };
+  builder = null;
+  $("builder").hidden = true;
+  setBackgroundInert(false);
+  if (restoreFocus) $("builder-button").focus({ preventScroll: true });
+}
+
+function playBuiltTrail(level) {
+  unlockAudio();
+  clearInput();
+  Object.assign(game, createGame(0, { level }));
+  startGame(game);
+  renderer.clearEffects();
+  processEvents();
+  updateUi();
+  focusGame();
+}
+
+function buildBuilderControls() {
+  $("builder-tools").replaceChildren(...TOOLS.map((tool, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `builder-tool tool-${tool}`;
+    button.dataset.tool = tool;
+    button.setAttribute("aria-keyshortcuts", String(index + 1));
+    const swatch = document.createElement("span");
+    swatch.className = "builder-swatch";
+    swatch.setAttribute("aria-hidden", "true");
+    const key = document.createElement("kbd");
+    key.textContent = String(index + 1);
+    key.setAttribute("aria-hidden", "true");
+    button.append(swatch, document.createTextNode(TOOL_LABELS[tool]), key);
+    button.addEventListener("click", () => {
+      pickBuilderTool(tool);
+      focusBuilderCell({ scroll: false });
+    });
+    return button;
+  }));
+  $("builder-theme").replaceChildren(...BUILDER_THEMES.map((theme) => new Option(THEMES[theme].label, theme)));
+}
+
+$("builder-theme").addEventListener("change", (event) => {
+  if (!builder || !BUILDER_THEMES.includes(event.target.value)) return;
+  builder.trail.theme = event.target.value;
+  builderChanged();
+});
+
+const cellFromEvent = (event) => {
+  const cell = event.target instanceof Element ? event.target.closest(".builder-cell") : null;
+  return cell ? [Number(cell.dataset.column), Number(cell.dataset.row)] : null;
+};
+
+// Mouse and pen paint while dragged. Touch paints on a tap (a click), so swiping still scrolls the grid.
+let builderPointer = "mouse";
+$("builder-grid").addEventListener("pointerdown", (event) => {
+  builderPointer = event.pointerType;
+  const spot = cellFromEvent(event);
+  if (!builder || !spot || event.button !== 0 || event.pointerType === "touch") return;
+  // Pens get implicit pointer capture, which stops pointerover firing on the other cells.
+  if (event.target.hasPointerCapture?.(event.pointerId)) event.target.releasePointerCapture(event.pointerId);
+  builder.painting = true;
+  paintBuilderCell(...spot);
+});
+$("builder-grid").addEventListener("pointerover", (event) => {
+  const spot = cellFromEvent(event);
+  if (!builder?.painting || !spot || !(event.buttons & 1)) return;
+  paintBuilderCell(...spot);
+});
+window.addEventListener("pointerup", () => { if (builder) builder.painting = false; });
+// Taps, and assistive tech that activates a cell with a click and no pointer press before it.
+$("builder-grid").addEventListener("click", (event) => {
+  const spot = cellFromEvent(event);
+  if (builder && spot && (event.detail === 0 || builderPointer === "touch")) paintBuilderCell(...spot);
+});
+$("builder-grid").addEventListener("focusin", (event) => {
+  const spot = cellFromEvent(event);
+  if (!builder || !spot || (spot[0] === builder.column && spot[1] === builder.row)) return;
+  [builder.column, builder.row] = spot;
+  syncBuilder();
+});
+
+window.addEventListener("keydown", (event) => {
+  if (!builder || $("help-dialog").open || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeBuilder();
+    return;
+  }
+  if (event.key === "Tab") {
+    // Keep focus inside the dialog: wrap between its first and last visible controls.
+    const stops = [...$("builder").querySelectorAll("button, select, input")].filter((control) => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length > 0);
+    const first = stops[0];
+    const last = stops.at(-1);
+    const inside = $("builder").contains(document.activeElement);
+    if (!inside || document.activeElement === (event.shiftKey ? first : last)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first)?.focus({ preventScroll: true });
+    }
+    return;
+  }
+  const typing = event.target instanceof Element && event.target.closest("input, select");
+  if (typing) return;
+  const tool = TOOLS[Number(event.key) - 1];
+  if (tool && !event.repeat) {
+    event.preventDefault();
+    pickBuilderTool(tool);
+    return;
+  }
+  const onGrid = event.target instanceof Element && event.target.closest(".builder-cell");
+  if (!onGrid) return;
+  const moves = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (moves[event.key]) {
+    event.preventDefault();
+    const [dx, dy] = moves[event.key];
+    builder.column = Math.min(Math.max(builder.column + dx, 0), builder.trail.columns - 1);
+    builder.row = Math.min(Math.max(builder.row + dy, 0), ROWS - 1);
+  } else if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    builder.column = event.key === "Home" ? 0 : builder.trail.columns - 1;
+  } else if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    if (!event.repeat) paintBuilderCell(builder.column, builder.row);
+  } else if (event.key === "Delete" || event.key === "Backspace") {
+    event.preventDefault();
+    paintBuilderCell(builder.column, builder.row, "erase");
+  } else return;
+  syncBuilder();
+  focusBuilderCell();
+});
+
+$("builder-button").addEventListener("click", openBuilder);
+$("builder-back").addEventListener("click", () => closeBuilder());
+$("builder-play").addEventListener("click", () => {
+  if (!builder) return;
+  const level = trailToLevel(builder.trail, { name: "Your trail" });
+  closeBuilder({ restoreFocus: false });
+  playBuiltTrail(level);
+});
+$("builder-share").addEventListener("click", () => {
+  if (!builder) return;
+  $("builder-share-url").value = shareUrl(encodeTrail(builder.trail), location);
+  $("builder-share-box").hidden = false;
+  $("builder-share-url").focus({ preventScroll: true });
+  $("builder-share-url").select();
+  announce("Share link ready. Copy it and send it to a friend.");
+});
+$("builder-copy").addEventListener("click", async () => {
+  const url = $("builder-share-url").value;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("Share link copied! Send it to a friend.");
+    announce("Share link copied.");
+  } catch (error) {
+    console.warn("Pup Quest could not copy the share link:", error);
+    $("builder-share-url").select();
+    toast("Copying isn't available here. The link is selected so you can copy it yourself.");
+  }
+});
+$("builder-example").addEventListener("click", () => {
+  if (!builder) return;
+  builder.trail = exampleTrail();
+  builderChanged();
+  focusBuilderCell();
+  announce("Loaded the example trail.");
+});
+$("builder-clear").addEventListener("click", () => {
+  if (!builder) return;
+  builder.trail = emptyTrail({ columns: builder.trail.columns, theme: builder.trail.theme });
+  builderChanged();
+  focusBuilderCell();
+  announce("Cleared the trail.");
+});
+buildBuilderControls();
+
+// `?trail=<code>` opens a shared trail on the title screen. A bad code falls back to the adventure with a friendly note.
+const shared = trailFromSearch(location.search);
+if (shared?.trail) Object.assign(game, createGame(0, { level: trailToLevel(shared.trail, { name: "Shared trail", shared: true }) }));
+else if (shared?.error) {
+  console.warn("Pup Quest could not load the shared trail:", shared.error);
+  toast(`${shared.error} Here's the regular adventure instead.`);
+}
+
 $("primary-button").addEventListener("click", primaryAction);
 $("pause-button").addEventListener("click", togglePause);
 $("secondary-button").addEventListener("click", () => {
@@ -856,7 +1183,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (!event.repeat) unlockAudio();
-  if (trailMap || kennel) return;
+  if (trailMap || kennel || builder) return;
   if (["Escape", "KeyP"].includes(event.code) && ["playing", "paused"].includes(game.status)) {
     event.preventDefault();
     if (!event.repeat) togglePause();
