@@ -121,6 +121,8 @@ function decodeOrThrow(code) {
   // base64url never leaves a single character over a multiple of four.
   if (!/^[A-Za-z0-9_-]+$/.test(code) || code.length % 4 === 1) fail("That trail code has characters that don't belong in a code.");
   const bytes = fromBase64Url(code);
+  // atob ignores unused bits in the last character, so only the canonical spelling is accepted.
+  if (toBase64Url(bytes) !== code) fail("That trail code has a typo somewhere. Check it was copied exactly.");
   if (bytes.length < HEADER_BYTES + CHECKSUM_BYTES) fail("That trail code is too short. Check it was copied in full.");
   const [version, themeIndex, columns, goal] = bytes;
   if (version !== CODE_VERSION) fail("That trail code was made by a different version of Pup Quest.");

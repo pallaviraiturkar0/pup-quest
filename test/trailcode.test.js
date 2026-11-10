@@ -11,6 +11,7 @@ import { THEMES } from "../src/themes.js";
 
 const toBytes = (code) => [...Buffer.from(code, "base64url")];
 const toCode = (bytes) => Buffer.from(bytes).toString("base64url");
+const B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 // Rewrites a code's bytes and fixes up its checksum, so only the edited field is wrong.
 function edit(code, change) {
   const bytes = toBytes(code).slice(0, -2);
@@ -91,6 +92,8 @@ test("malformed codes are rejected with a friendly message and never throw", () 
     // 31 columns of 18 bits leave two unused bits in the last byte.
     edit(encodeTrail(emptyTrail({ columns: 31 })), (bytes) => { bytes[bytes.length - 1] |= 1; }),
     edit(EXAMPLE_CODE, (bytes) => { bytes.push(0); }),
+    // atob drops the unused low bits of the last character; a noncanonical spelling must still be refused.
+    ((code) => code.slice(0, -1) + B64URL[B64URL.indexOf(code.at(-1)) ^ 1])(encodeTrail(emptyTrail({ columns: 30 }))),
   ];
   for (const code of bad) {
     const result = decodeTrail(code);

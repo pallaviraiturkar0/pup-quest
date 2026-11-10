@@ -264,7 +264,8 @@ function updateUi() {
   $("lives").innerHTML = Array.from({ length: Math.max(3, game.lives) }, (_, index) => heartMarkup(index >= game.lives)).join("");
   $("lives").setAttribute("aria-label", `${game.lives} ${game.lives === 1 ? "life" : "lives"} remaining`);
   if (game.status === "playing") $("objective").textContent = objective();
-  if (game.score > bestScore) {
+  // Built and shared trails are just for fun and never change the saved personal best.
+  if (!game.level.built && game.score > bestScore) {
     bestScore = game.score;
     savedPreference("best", String(bestScore));
   }
@@ -860,6 +861,8 @@ applySavedSkin();
 const BUILDER_DRAFT_KEY = "builder-draft";
 const ROW_NAMES = Array.from({ length: ROWS }, (_, row) => row === GROUND_ROW ? "ground" : `height ${GROUND_ROW - row}`);
 let builderCells = [];
+// The trail being edited, kept across closing and reopening the builder. `seed` is the played code it came from.
+let builderWork = null;
 
 function cellContent(trail, column, row) {
   if (row === GROUND_ROW) {
@@ -894,6 +897,7 @@ function buildBuilderGrid(columns) {
 }
 
 function syncBuilder() {
+  builder.column = Math.min(builder.column, builder.trail.columns - 1);
   const { trail, column: focusColumn, row: focusRow, tool } = builder;
   buildBuilderGrid(trail.columns);
   builderCells.forEach((cells, row) => cells.forEach((cell, column) => {
@@ -959,10 +963,16 @@ function syncBuilderButton() {
 function openBuilder() {
   if (!mapAvailable()) return;
   clearInput();
-  // A built or shared trail opens for editing; otherwise the saved draft (or a fresh trail).
-  const current = game.level.built ? decodeTrail(game.level.built.code).trail : null;
-  const trail = current ?? savedDraft() ?? emptyTrail();
-  builder = { trail, column: 3, row: GROUND_ROW - 1, tool: builder?.tool ?? "platform", painting: false };
+  // A newly played built or shared trail opens for editing; otherwise keep editing the last
+  // trail (or the saved draft, or a fresh trail).
+  const seed = game.level.built?.code ?? null;
+  if (seed && seed !== builderWork?.seed) {
+    const played = decodeTrail(seed).trail;
+    if (played) builderWork = { seed, trail: played, tool: builderWork?.tool };
+  }
+  builderWork ??= { seed: null, trail: savedDraft() ?? emptyTrail() };
+  const { trail } = builderWork;
+  builder = { trail, column: 3, row: GROUND_ROW - 1, tool: builderWork.tool ?? "platform", painting: false };
   $("builder-share-box").hidden = true;
   syncBuilder();
   $("builder").hidden = false;
@@ -973,6 +983,7 @@ function openBuilder() {
 
 function closeBuilder({ restoreFocus = true } = {}) {
   if (!builder) return;
+  builderWork = { ...builderWork, trail: builder.trail, tool: builder.tool };
   builder = null;
   $("builder").hidden = true;
   setBackgroundInert(false);
