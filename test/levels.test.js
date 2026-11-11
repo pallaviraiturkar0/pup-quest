@@ -216,8 +216,11 @@ test("Harvest Hollow's hay bales matter: the golden key and the lofts need a hay
   assert.ok(hayBales.every((bale) => bale.w >= 3 * TILE), "bales are wide enough to land on comfortably");
   const withHay = reachableSurfaces(BONUS_TRAIL);
   const ordinary = reachableSurfaces(BONUS_TRAIL, false);
-  const lofts = withHay.surfaces.filter((surface) => !ordinary.reachable.has(surface));
-  assert.ok(lofts.length >= 3, "hay opens up lofts that ordinary jumps cannot reach");
+  // Each call builds fresh surface objects, so compare them by their stable ids.
+  const ordinaryIds = new Set([...ordinary.reachable].map((surface) => surface.id));
+  const lofts = withHay.surfaces.filter((surface) => !ordinaryIds.has(surface.id));
+  assert.ok(lofts.length >= 2 && lofts.every((loft) => loft.y === 6 * TILE), `hay opens up lofts that ordinary jumps cannot reach (${lofts.map((loft) => loft.id)})`);
+  assert.ok(lofts.some((loft) => canTouch(loft, BONUS_TRAIL.key)), "one of them is the key's hayloft");
   assert.ok(lofts.every((loft) => withHay.reachable.has(loft)));
   assert.ok(![...ordinary.reachable].some((surface) => canTouch(surface, BONUS_TRAIL.key, false)), "the key needs a hay-bale jump");
   assert.ok([...withHay.reachable].some((surface) => surface.hay && canTouch(surface, BONUS_TRAIL.key)), "a bale can launch the pup to the key");

@@ -277,7 +277,8 @@ function updateUi() {
   document.querySelectorAll("[data-trail]").forEach((trail, index) => {
     // A bonus or secret run or Daily Walk is not campaign progress, so show the trails actually cleared on this device.
     const offCampaign = game.level.secret || game.level.bonus || game.level.daily || game.level.built;
-    const done = index >= LEVELS.length ? bestTimes[index] !== null
+    // The bonus trail's row is done once it has a saved time, or right now on its own victory screen.
+    const done = index >= LEVELS.length ? bestTimes[index] !== null || (index === game.levelIndex && game.status === "won")
       : offCampaign ? index < unlockedTrails - 1 || bestTimes[index] !== null : index < game.levelIndex || game.status === "won";
     const current = !game.level.built && index === game.levelIndex;
     trail.classList.toggle("active", current);
