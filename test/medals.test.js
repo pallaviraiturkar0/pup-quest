@@ -5,7 +5,7 @@ import {
   recordBestTime, recordKeys, runMs, serializeBestTimes, spokenTime, withSaveLock,
 } from "../src/medals.js";
 import { createGame, pauseGame, resumeGame, startGame, stepGame } from "../src/engine.js";
-import { LEVELS, TRAILS } from "../src/levels.js";
+import { BONUS_INDEX, LEVELS, TRAILS } from "../src/levels.js";
 import { contrastRatio } from "../src/trailmap.js";
 
 const TOTAL = LEVELS.length;
@@ -62,6 +62,19 @@ test("the secret trail's best time is saved under its own key, apart from runs b
   assert.deepEqual(parseBestTimes(old, keys), [20_000, ...Array(TRAILS.length - 1).fill(null)], "campaign records load; a boss-free Fjord time is not a Yeti-run record");
   const commit = commitBestTimes(times, old, keys);
   assert.equal(commit.raw, '{"1":20000,"8-yeti":30000}');
+});
+
+test("Trail 08's best time has its own key, so old saves load unchanged and never fill it in", () => {
+  const keys = recordKeys(TRAILS);
+  assert.equal(keys[BONUS_INDEX], "8-harvest");
+  assert.equal(new Set(keys).size, keys.length, "every trail saves under a different key");
+  const old = '{"1":20000,"7":61000,"8":55000}';
+  const loaded = parseBestTimes(old, keys);
+  assert.equal(loaded[TOTAL - 1], 61_000, "a Moonlit Keep time from before Trail 08 still loads");
+  assert.equal(loaded[BONUS_INDEX], null, "a pre-Yeti Fjord time is not a Harvest Hollow record");
+  const times = [...loaded];
+  times[BONUS_INDEX] = 31_000;
+  assert.equal(commitBestTimes(times, old, keys).raw, '{"1":20000,"7":61000,"8-harvest":31000}');
 });
 
 test("saved best times survive missing, corrupt, and tampered data", () => {

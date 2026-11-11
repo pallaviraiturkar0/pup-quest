@@ -74,7 +74,7 @@ test("trails survive an encode/decode round trip", () => {
 });
 
 test("every builder theme is a real theme, and the order is append-only", () => {
-  assert.deepEqual(BUILDER_THEMES.slice(0, 8), ["meadow", "forest", "night", "park", "beach", "city", "castle", "arctic"]);
+  assert.deepEqual(BUILDER_THEMES.slice(0, 9), ["meadow", "forest", "night", "park", "beach", "city", "castle", "arctic", "autumn"]);
   assert.ok(BUILDER_THEMES.every((theme) => Object.hasOwn(THEMES, theme)));
 });
 

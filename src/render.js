@@ -6,6 +6,8 @@ import { activeParticles, calmParticles, clearParticles, createParticles, emitFo
 import { resolveColor, THEMES, themeForLevel } from "./themes.js";
 import { DEFAULT_SKIN, drawPup, getSkin } from "./kennel.js";
 
+const HAY = Object.freeze({ straw: "#e2bf62", light: "#f3dc8d", shade: "#c09a45", twine: "#a7783a" });
+
 const noise = (n) => {
   const value = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return value - Math.floor(value);
@@ -141,10 +143,11 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       const x = 376 - game.cameraX * layer.parallax;
       const halo = resolveColor(theme, layer.halo);
       const color = resolveColor(theme, layer.color);
-      rect(x - 3, 25, 32, 32, halo);
-      rect(x + 3, 21, 20, 40, halo);
-      rect(x, 29, 26, 24, color);
-      rect(x + 5, 24, 16, 34, color);
+      const top = layer.top ?? 25;
+      rect(x - 3, top, 32, 32, halo);
+      rect(x + 3, top - 4, 20, 40, halo);
+      rect(x, top + 4, 26, 24, color);
+      rect(x + 5, top - 1, 16, 34, color);
       return x;
     },
     moon(layer, game, time, theme) {
@@ -283,7 +286,11 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
         const x = i * 88 - (scroll % 88) + noise(index) * 21;
         const size = 0.7 + noise(index + 40) * 0.65;
         if (layer.style === "round") tree(x, 199, size, theme.palette, true);
-        else pine(x, 204, size, theme.palette);
+        else if (layer.style === "autumn") {
+          // Each tree keeps its own canopy colour as the camera scrolls.
+          const canopy = layer.colors[Math.floor(noise(index + 41) * layer.colors.length)];
+          tree(x, 199, size, { ...theme.palette, treeBack: canopy }, true);
+        } else pine(x, 204, size, theme.palette);
       }
     },
     palms(layer, game, time, theme) {
@@ -353,6 +360,51 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       }
       ctx.globalAlpha = 1;
     },
+    harvest(layer, game, time, theme) {
+      const { spacing } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      const hay = resolveColor(theme, layer.hay);
+      const twine = resolveColor(theme, layer.twine);
+      const pumpkin = resolveColor(theme, layer.pumpkin);
+      const stem = resolveColor(theme, layer.stem);
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        const index = i + Math.floor(scroll / spacing);
+        const x = Math.round(i * spacing - (scroll % spacing) + noise(index + 210) * 20);
+        if (noise(index + 211) < 0.5) {
+          rect(x, 188, 22, 11, hay);
+          rect(x, 188, 22, 2, theme.palette.grassLight);
+          rect(x + 6, 188, 1, 11, twine);
+          rect(x + 15, 188, 1, 11, twine);
+          if (noise(index + 212) < 0.4) {
+            rect(x + 5, 179, 13, 9, hay);
+            rect(x + 11, 179, 1, 9, twine);
+          }
+        } else {
+          for (let p = 0; p < 3; p += 1) {
+            if (noise(index * 3 + p + 213) < 0.3) continue;
+            const px = x + p * 10;
+            rect(px, 193, 9, 6, pumpkin);
+            rect(px + 1, 192, 7, 1, pumpkin);
+            rect(px + 3, 193, 1, 6, theme.palette.dirtDark);
+            rect(px + 4, 190, 2, 2, stem);
+          }
+        }
+      }
+    },
+    leaves(layer, game, time, theme) {
+      const scroll = game.cameraX * layer.parallax;
+      for (let i = 0; i < layer.count; i += 1) {
+        const color = resolveColor(theme, layer.colors[i % layer.colors.length]);
+        const fall = 9 + noise(i + 501) * 12;
+        const sway = Math.sin(time * 1.2 + i * 1.7) * 10;
+        const x = wrap(noise(i + 500) * 560 - scroll + sway - time * 6, 560) - 40;
+        const y = wrap(noise(i + 502) * 240 + time * fall, 240) - 12;
+        // Leaves tumble between a flat and an upright pose as they flutter down.
+        const flip = Math.floor(time * 3 + i) % 2;
+        rect(x, y, flip ? 3 : 2, flip ? 2 : 3, color);
+        rect(x + (flip ? 1 : 0), y + (flip ? 2 : 0), 1, 1, theme.palette.trunk);
+      }
+    },
     lamps(layer, game, time, theme) {
       const { spacing } = layer;
       const scroll = game.cameraX * layer.parallax;
@@ -409,6 +461,24 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     }
   }
 
+  // A row of springy hay bales, one per tile, on a little wooden cart.
+  function hayBales(surface, palette, floating, camera) {
+    if (surface.x > camera + VIEW_WIDTH || surface.x + surface.w < camera) return;
+    rect(surface.x + 3, surface.y + 14, surface.w - 6, 3, palette.trunk);
+    rect(surface.x + 5, surface.y + 17, 2, 6, palette.trunk);
+    rect(surface.x + surface.w - 7, surface.y + 17, 2, 6, palette.trunk);
+    for (let x = surface.x; x < surface.x + surface.w; x += 16) {
+      rect(x, surface.y - 1, 16, 15, HAY.straw);
+      rect(x, surface.y - 1, 16, 2, HAY.light);
+      rect(x, surface.y + 12, 16, 2, HAY.shade);
+      rect(x + 4, surface.y - 1, 1, 15, HAY.twine);
+      rect(x + 11, surface.y - 1, 1, 15, HAY.twine);
+      rect(x + 7, surface.y + 4, 2, 1, HAY.light);
+      rect(x + 13, surface.y + 8, 2, 1, HAY.shade);
+      rect(x, surface.y - 1, 1, 15, HAY.shade);
+    }
+  }
+
   // A glossy sheet of ice over a slippery stretch, with glints and (on ledges) little icicles.
   function iceSheet(x, y, w, floating, camera) {
     if (x > camera + VIEW_WIDTH || x + w < camera) return;
@@ -442,6 +512,28 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     rect(x, GROUND_Y - 6, 1, 1, "#2e3440");
     rect(x - 13, GROUND_Y - 13, 5, 1, palette.trunk);
     rect(x + 9, GROUND_Y - 14, 5, 1, palette.trunk);
+  }
+
+  function pumpkin(x, y) {
+    rect(x - 4, y - 6, 9, 6, "#e2772c");
+    rect(x - 3, y - 7, 7, 1, "#e2772c");
+    rect(x - 1, y - 6, 1, 6, "#b9551f");
+    rect(x + 2, y - 6, 1, 6, "#b9551f");
+    rect(x, y - 9, 2, 2, "#5f6b33");
+  }
+
+  function scarecrow(x, palette) {
+    rect(x, GROUND_Y - 30, 2, 30, palette.trunk);
+    rect(x - 12, GROUND_Y - 24, 26, 2, palette.trunk);
+    rect(x - 6, GROUND_Y - 24, 14, 12, "#5f7fa3");
+    rect(x - 2, GROUND_Y - 22, 6, 2, "#e2bf62");
+    rect(x - 12, GROUND_Y - 22, 3, 3, "#e2bf62");
+    rect(x + 11, GROUND_Y - 22, 3, 3, "#e2bf62");
+    rect(x - 3, GROUND_Y - 33, 8, 8, "#efd9a6");
+    rect(x - 1, GROUND_Y - 30, 1, 1, "#3b2f17");
+    rect(x + 2, GROUND_Y - 30, 1, 1, "#3b2f17");
+    rect(x - 6, GROUND_Y - 35, 14, 2, "#8a5a35");
+    rect(x - 3, GROUND_Y - 39, 8, 4, "#8a5a35");
   }
 
   function flower(x, y, palette, seed) {
@@ -499,6 +591,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       if (noise(seed + 8) > 0.88) {
         if (decor.scatter === "mushroom") mushroom(x + 12, GROUND_Y, palette);
         else if (decor.scatter === "shell") shell(x + 13, GROUND_Y);
+        else if (decor.scatter === "pumpkin") pumpkin(x + 13, GROUND_Y);
         else if (decor.scatter === "snowdrift") {
           rect(x + 8, GROUND_Y - 3, 14, 3, palette.grassLight);
           rect(x + 11, GROUND_Y - 5, 7, 2, palette.grassLight);
@@ -518,6 +611,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       else if (decor.landmark === "bench") bench(x, palette);
       else if (decor.landmark === "hydrant") hydrant(x);
       else if (decor.landmark === "snowman") snowman(x, palette);
+      else if (decor.landmark === "scarecrow") scarecrow(x, palette);
       else if (decor.landmark === "stump") {
         rect(x - 8, GROUND_Y - 13, 18, 12, palette.trunk);
         rect(x - 10, GROUND_Y - 15, 22, 5, palette.dirtLight);
@@ -1037,7 +1131,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     }
     decorations(game, theme);
     for (const ground of game.level.ground) terrain(ground, palette, false, game.cameraX);
-    for (const platform of game.level.platforms) terrain(platform, palette, true, game.cameraX);
+    for (const platform of game.level.platforms) (platform.hay ? hayBales : terrain)(platform, palette, true, game.cameraX);
     for (const span of game.level.ice ?? []) iceSheet(span.x, GROUND_Y, span.w, false, game.cameraX);
     for (const { ice, y } of game.level.platforms) if (ice) iceSheet(ice.x, y, ice.w, true, game.cameraX);
     for (const spike of game.level.spikes) {

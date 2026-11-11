@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { enemyReach } from "../src/enemies.js";
-import { ICE, intersects, PHYSICS } from "../src/engine.js";
-import { GROUND_Y, LEVELS, SECRET_INDEX, SECRET_TRAIL, TRAILS, VIEW_HEIGHT } from "../src/levels.js";
+import { HAY, ICE, intersects, PHYSICS } from "../src/engine.js";
+import { BONUS_INDEX, BONUS_TRAIL, GROUND_Y, LEVELS, SECRET_INDEX, SECRET_TRAIL, TILE, TRAILS, VIEW_HEIGHT } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
 
 const PUPPY = { w: 14, h: 18 };
@@ -10,31 +10,34 @@ const PICKUP_RADIUS = 9;
 // Leave a little slack so the static check never approves a pixel-perfect jump.
 const RISE_MARGIN = 3;
 const REACH_MARGIN = 8;
-const JUMP_HEIGHT = PHYSICS.jump ** 2 / (2 * PHYSICS.gravity);
+const jumpHeight = (v) => v ** 2 / (2 * PHYSICS.gravity);
+const JUMP_HEIGHT = jumpHeight(PHYSICS.jump);
+// Hay bales launch a much bigger jump; `useHay: false` checks a trail with ordinary jumps only.
+const takeoff = (surface, useHay = true) => (useHay && surface.hay ? HAY.jump : PHYSICS.jump);
 
 function surfacesOf(level) {
   return [
-    ...level.ground.map((block, index) => ({ id: `ground ${index}`, x0: block.x, x1: block.x + block.w, y: block.y })),
-    ...level.platforms.map((block, index) => ({ id: `platform ${index}`, x0: block.x, x1: block.x + block.w, y: block.y })),
+    ...level.ground.map((block, index) => ({ id: `ground ${index}`, x0: block.x, x1: block.x + block.w, y: block.y, hay: false })),
+    ...level.platforms.map((block, index) => ({ id: `platform ${index}`, x0: block.x, x1: block.x + block.w, y: block.y, hay: Boolean(block.hay) })),
   ];
 }
 
 // A full-speed jump can land `rise` pixels higher (negative: lower) this far away.
-function horizontalReach(rise) {
-  const v = PHYSICS.jump;
+function horizontalReach(rise, v = PHYSICS.jump) {
   const discriminant = v * v - 2 * PHYSICS.gravity * rise;
   if (discriminant < 0) return -Infinity;
   return PHYSICS.speed * (v + Math.sqrt(discriminant)) / PHYSICS.gravity;
 }
 
-function canHop(from, to) {
+function canHop(from, to, useHay = true) {
+  const v = takeoff(from, useHay);
   const rise = from.y - to.y;
-  if (rise > JUMP_HEIGHT - RISE_MARGIN) return false;
+  if (rise > jumpHeight(v) - RISE_MARGIN) return false;
   const gap = Math.max(0, to.x0 - from.x1, from.x0 - to.x1);
   // Dropping straight down from a ledge onto an overlapping lower surface.
   if (gap === 0) return true;
   // The puppy only needs to overlap each ledge, so its own width helps.
-  return gap - PUPPY.w + REACH_MARGIN <= horizontalReach(rise);
+  return gap - PUPPY.w + REACH_MARGIN <= horizontalReach(rise, v);
 }
 
 function surfaceUnder(surfaces, x) {
@@ -43,7 +46,7 @@ function surfaceUnder(surfaces, x) {
     .sort((a, b) => a.y - b.y)[0];
 }
 
-function reachableSurfaces(level) {
+function reachableSurfaces(level, useHay = true) {
   const surfaces = surfacesOf(level);
   const start = surfaces.find((surface) => surface.id.startsWith("ground") &&
     level.start.x >= surface.x0 && level.start.x + PUPPY.w <= surface.x1);
@@ -53,7 +56,7 @@ function reachableSurfaces(level) {
   while (queue.length) {
     const from = queue.shift();
     for (const to of surfaces) {
-      if (!seen.has(to) && canHop(from, to)) {
+      if (!seen.has(to) && canHop(from, to, useHay)) {
         seen.add(to);
         queue.push(to);
       }
@@ -62,8 +65,8 @@ function reachableSurfaces(level) {
   return { surfaces, reachable: seen };
 }
 
-function canTouch(surface, point) {
-  const top = surface.y - PUPPY.h - JUMP_HEIGHT + RISE_MARGIN;
+function canTouch(surface, point, useHay = true) {
+  const top = surface.y - PUPPY.h - jumpHeight(takeoff(surface, useHay)) + RISE_MARGIN;
   return point.x >= surface.x0 - PICKUP_RADIUS && point.x <= surface.x1 + PICKUP_RADIUS &&
     point.y + PICKUP_RADIUS >= top && point.y - PICKUP_RADIUS <= surface.y;
 }
@@ -184,12 +187,45 @@ test("Frosty Fjord is a secret arctic trail kept outside the campaign", () => {
   assert.equal(SECRET_TRAIL.name, "Frosty Fjord");
   assert.equal(SECRET_TRAIL.theme, "arctic");
   assert.equal(SECRET_TRAIL.secret, true);
-  assert.equal(SECRET_INDEX, LEVELS.length);
+  assert.equal(SECRET_INDEX, LEVELS.length + 1, "it comes after the bonus Trail 08");
   assert.equal(TRAILS[SECRET_INDEX], SECRET_TRAIL);
   assert.ok(LEVELS.every((level) => !level.secret && level.ice.length === 0 && level.platforms.every((platform) => !platform.ice)),
     "campaign trails keep their grip");
   assert.equal(SECRET_TRAIL.boss?.kind, "yeti", "the Grumpy Yeti guards its key");
   assert.ok(!TRAILS.slice(0, -1).some((level) => level.name === SECRET_TRAIL.name));
+});
+
+test("Harvest Hollow is Trail 08: an autumn bonus trail after the campaign, built from familiar critters and power-ups", () => {
+  assert.equal(BONUS_TRAIL.name, "Harvest Hollow");
+  assert.equal(BONUS_TRAIL.theme, "autumn");
+  assert.equal(BONUS_INDEX, LEVELS.length);
+  assert.equal(TRAILS[BONUS_INDEX], BONUS_TRAIL);
+  assert.equal(BONUS_TRAIL.bonus, true);
+  assert.equal(BONUS_TRAIL.secret, false);
+  assert.equal(BONUS_TRAIL.boss, null, "the Mega-Vac stays the only campaign boss");
+  assert.ok(!LEVELS.includes(BONUS_TRAIL), "the campaign is still seven trails");
+  assert.ok(BONUS_TRAIL.width > LEVELS.at(-1).width - 20 * TILE, "a full-length trail");
+  assert.deepEqual(new Set(BONUS_TRAIL.enemies.map((enemy) => enemy.type)), new Set(["squirrel", "cat", "seagull"]));
+  assert.deepEqual(BONUS_TRAIL.powerups.map((item) => item.type).sort(), ["bone", "squeaky", "zoomies"]);
+  assert.ok(TRAILS.every((level) => level === BONUS_TRAIL || level.platforms.every((platform) => !platform.hay)), "only Harvest Hollow has hay");
+});
+
+test("Harvest Hollow's hay bales matter: the golden key and the lofts need a hay-bale jump, and every treat can be reached", () => {
+  const hayBales = BONUS_TRAIL.platforms.filter((platform) => platform.hay);
+  assert.ok(hayBales.length >= 4, "a few bale carts along the way");
+  assert.ok(hayBales.every((bale) => bale.w >= 3 * TILE), "bales are wide enough to land on comfortably");
+  const withHay = reachableSurfaces(BONUS_TRAIL);
+  const ordinary = reachableSurfaces(BONUS_TRAIL, false);
+  const lofts = withHay.surfaces.filter((surface) => !ordinary.reachable.has(surface));
+  assert.ok(lofts.length >= 3, "hay opens up lofts that ordinary jumps cannot reach");
+  assert.ok(lofts.every((loft) => withHay.reachable.has(loft)));
+  assert.ok(![...ordinary.reachable].some((surface) => canTouch(surface, BONUS_TRAIL.key, false)), "the key needs a hay-bale jump");
+  assert.ok([...withHay.reachable].some((surface) => surface.hay && canTouch(surface, BONUS_TRAIL.key)), "a bale can launch the pup to the key");
+  for (const treat of BONUS_TRAIL.treats) {
+    assert.ok([...withHay.reachable].some((surface) => canTouch(surface, treat)), `treat at x=${treat.x}, y=${treat.y} cannot be reached`);
+  }
+  const hayOnly = BONUS_TRAIL.treats.filter((treat) => ![...ordinary.reachable].some((surface) => canTouch(surface, treat, false)));
+  assert.ok(hayOnly.length >= 6, `some treats reward a bale bounce (${hayOnly.length})`);
 });
 
 test("ice is fair: patches sit on solid ground, clear of ledges, spikes, critters, and checkpoints", () => {

@@ -1,6 +1,6 @@
 import { bossDefeated } from "./boss.js";
 import { createGame, nextLevel, pauseGame, restartGame, resumeGame, startGame, stepGame } from "./engine.js";
-import { LEVELS, SECRET_INDEX, SECRET_TRAIL, TRAILS } from "./levels.js";
+import { BONUS_INDEX, BONUS_TRAIL, LEVELS, SECRET_INDEX, SECRET_TRAIL, TRAILS } from "./levels.js";
 import { createRenderer } from "./render.js";
 import { THEMES, themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
@@ -10,7 +10,7 @@ import {
   runMs, spokenTime, withSaveLock,
 } from "./medals.js";
 import {
-  chooseTrail, createTrailMap, isStopOpen, mergeUnlocked, moveSelection, parseUnlocked, secretTrailOpen, stopColors, trailPath, UNLOCK_KEY,
+  bonusTrailOpen, chooseTrail, createTrailMap, isStopOpen, mergeUnlocked, moveSelection, parseUnlocked, secretTrailOpen, stopColors, trailPath, UNLOCK_KEY,
   unlockAfterClear,
 } from "./trailmap.js";
 import {
@@ -198,6 +198,7 @@ function syncOverlay() {
   // Built trails are just for fun: their times are shown but never saved.
   const run = ["level-complete", "won"].includes(game.status) ? built ? { ms: runMs(game.levelTime) } : walk ? recordDailyClear() : recordClear(game.levelIndex) : null;
   const secret = Boolean(game.level.secret);
+  const bonus = Boolean(game.level.bonus);
   const finaleNext = game.status === "level-complete" && Boolean(LEVELS[game.levelIndex + 1]?.boss);
   const screens = {
     ready: built?.shared
@@ -214,6 +215,8 @@ function syncOverlay() {
         : "Your trail works! Open the Trail builder to tweak it or copy its share code.", "Play again"]
       : walk
       ? ["DAILY WALK COMPLETE", "Walkies done, good dog!", dailyResultText(walk, run), "Walk again"]
+      : bonus
+      ? ["HARVEST HOLLOW CLEARED", "Hay there, good dog!", `${game.level.name}, cleared! You bounced through the bale carts and found the golden key in the hayloft. Race it again to chase a shinier paw medal.`, "Hop again"]
       : secret
       ? ["SECRET TRAIL CONQUERED", "Brrr-avo, good dog!", `${game.level.name}, conquered! The Grumpy Yeti just needed a belly rub, and now it's your fluffiest friend. Race it again to chase a shinier paw medal.`, "Slide again"]
       : ["CHAMPION OF MOONLIT KEEP", "Victory, very good dog!", "The Mega-Vac is out of power and the golden key is home. Seven trails, a pocket full of treats, and the comfiest nap in the kingdom. Well done, Biscuit.", "Play again"],
@@ -229,12 +232,12 @@ function syncOverlay() {
   $("secondary-button").hidden = game.status !== "paused";
   $("map-button").hidden = !mapAvailable();
   $("kennel-button").hidden = !mapAvailable();
-  $("victory-badge").hidden = game.status !== "won" || secret || Boolean(walk) || Boolean(built);
+  $("victory-badge").hidden = game.status !== "won" || secret || bonus || Boolean(walk) || Boolean(built);
   syncDailyButton();
   syncBuilderButton();
   $("overlay-hint").textContent = overlayHint();
-  // A single cleared trail (including the secret one) shows that trail's treats and time.
-  const single = game.status === "level-complete" || (game.status === "won" && (secret || Boolean(walk) || Boolean(built)));
+  // A single cleared trail (including the bonus and secret ones) shows that trail's treats and time.
+  const single = game.status === "level-complete" || (game.status === "won" && (secret || bonus || Boolean(walk) || Boolean(built)));
   const stats = ["level-complete", "game-over", "won"].includes(game.status)
     ? [["TREATS", single ? `${game.levelTreats}/${game.level.treats.length}` : String(game.totalTreats)], ["SCORE", String(game.score)], ["TIME", single ? formatTime(run.ms) : timeLabel(game.elapsed)]]
     : [];
@@ -242,9 +245,10 @@ function syncOverlay() {
   setResultStats(stats);
   // Daily Walks race today's best instead of a trail's paw medals, and built trails have no medals.
   showMedalResult(walk || built ? null : run);
-  if (run?.secretRevealed) toast(`A chilly breeze… a secret trail appeared on the Trail Map: ${SECRET_TRAIL.name}!`);
+  if (run?.bonusRevealed) toast(`The leaves are turning… Trail 08, ${BONUS_TRAIL.name}, opened on the Trail Map!`);
+  else if (run?.secretRevealed) toast(`A chilly breeze… a secret trail appeared on the Trail Map: ${SECRET_TRAIL.name}!`);
   if (game.status !== "ready") {
-    announce(`${title} ${description}${run ? ` ${walk ? `Walk time ${spokenTime(run.ms)}.` : built ? `Trail time ${spokenTime(run.ms)}.` : medalSpeech(run)}` : ""}${run?.secretRevealed ? ` A secret trail, ${SECRET_TRAIL.name}, appeared on the Trail Map.` : ""}`);
+    announce(`${title} ${description}${run ? ` ${walk ? `Walk time ${spokenTime(run.ms)}.` : built ? `Trail time ${spokenTime(run.ms)}.` : medalSpeech(run)}` : ""}${run?.bonusRevealed ? ` Trail 08, ${BONUS_TRAIL.name}, opened on the Trail Map.` : ""}${run?.secretRevealed ? ` A secret trail, ${SECRET_TRAIL.name}, appeared on the Trail Map.` : ""}`);
     $("primary-button").focus({ preventScroll: true });
   }
 }
@@ -271,9 +275,10 @@ function updateUi() {
   }
   $("best-score").textContent = String(bestScore).padStart(4, "0");
   document.querySelectorAll("[data-trail]").forEach((trail, index) => {
-    // A secret run or Daily Walk is not campaign progress, so show the trails actually cleared on this device.
-    const offCampaign = game.level.secret || game.level.daily || game.level.built;
-    const done = offCampaign ? index < unlockedTrails - 1 || bestTimes[index] !== null : index < game.levelIndex || game.status === "won";
+    // A bonus or secret run or Daily Walk is not campaign progress, so show the trails actually cleared on this device.
+    const offCampaign = game.level.secret || game.level.bonus || game.level.daily || game.level.built;
+    const done = index >= LEVELS.length ? bestTimes[index] !== null
+      : offCampaign ? index < unlockedTrails - 1 || bestTimes[index] !== null : index < game.levelIndex || game.status === "won";
     const current = !game.level.built && index === game.levelIndex;
     trail.classList.toggle("active", current);
     if (current) trail.setAttribute("aria-current", "step");
@@ -297,7 +302,7 @@ function processEvents() {
     if (event.type === "key") toast("Golden key found! The doghouse is open.");
     if (event.type === "powerup") toast(POWERUP_MESSAGES[event.powerup](event));
     if (event.type === "checkpoint") toast("Checkpoint! A safe spot for little paws.");
-    if (event.type === "need-key") toast(game.level.boss && !bossDefeated(game.level.boss) ? `The door is locked. ${game.level.boss.kind === "yeti" ? "Befriend the Grumpy Yeti" : "Beat the Mega-Vac"} to win the golden key!` : "The door is locked. Find the golden key first!");
+    if (event.type === "need-key") toast(game.level.boss && !bossDefeated(game.level.boss) ? `The door is locked. ${game.level.boss.kind === "yeti" ? "Befriend the Grumpy Yeti" : "Beat the Mega-Vac"} to win the golden key!` : game.level.bonus ? "The door is locked. The golden key is up in a hayloft: bounce off a hay bale to reach it!" : "The door is locked. Find the golden key first!");
     if (event.type === "boss-wake") toast("The Mega-Vac whirs awake! Dodge its charge from a ledge, then stomp its lid while it's dizzy.");
     if (event.type === "boss-crash") toast("CRASH! It's dizzy. Stomp the lid!");
     if (event.type === "boss-bonk") toast(game.level.boss?.kind === "yeti" ? "Boing! Trip it up on the ice first." : "Clang! Its lid only dents while it's dizzy.");
@@ -316,6 +321,8 @@ function processEvents() {
         ? `${game.level.name}. Reach the doghouse. Treats are optional.`
         : game.level.daily
         ? `Daily Walk for ${game.level.daily.date}: ${game.level.daily.title}. ${daily.date === game.level.daily.date ? daily.blurb : ""} Find the golden key and reach the doghouse.`
+        : game.level.bonus
+        ? `Trail 08, bonus trail: ${game.level.name}. Jump from the springy hay bales to reach the haylofts. Find the golden key and reach the doghouse.`
         : game.level.secret
         ? `Secret trail: ${game.level.name}. Watch your paws on the shiny blue ice. Find the golden key and reach the doghouse.`
         : `Trail ${game.levelIndex + 1} of ${LEVELS.length}: ${game.level.name}. Find the golden key and reach the doghouse.`);
@@ -333,7 +340,7 @@ function primaryAction() {
     // Walking again after midnight UTC starts the new day's walk.
     startDailyWalk();
     return;
-  } else if (game.status === "won") restartGame(game, game.level.secret ? SECRET_INDEX : 0);
+  } else if (game.status === "won") restartGame(game, game.level.secret || game.level.bonus ? game.levelIndex : 0);
   else if (game.status === "game-over") restartGame(game);
   renderer.clearEffects();
   processEvents();
@@ -370,11 +377,13 @@ function recordClear(index) {
   const ms = runMs(game.levelTime);
   const { par } = TRAILS[index];
   const wasSecretOpen = secretTrailOpen(latestBestTimes(), LEVELS);
+  const wasBonusOpen = bonusTrailOpen(bestTimes, LEVELS);
   const result = recordBestTime(bestTimes, index, ms);
   bestTimes = result.times;
   if (result.newBest) saveBestTimes();
   const secretRevealed = !wasSecretOpen && secretTrailOpen(bestTimes, LEVELS);
-  return { index, ms, best: result.best, newBest: result.newBest, medal: medalFor(ms, par), next: nextMedal(ms, par), secretRevealed };
+  const bonusRevealed = !wasBonusOpen && bonusTrailOpen(bestTimes, LEVELS);
+  return { index, ms, best: result.best, newBest: result.newBest, medal: medalFor(ms, par), next: nextMedal(ms, par), secretRevealed, bonusRevealed };
 }
 
 // Daily Walk: one remixed trail per UTC day. Its best time is kept apart from the trail medals.
@@ -477,7 +486,7 @@ function showMedalResult(run) {
   $("medal-result").className = `medal-result ${medal ?? "none"}${newBest ? " new-best" : ""}`;
   $("medal-icon").innerHTML = medal ? medalSvg(medal) : "";
   $("medal-name").textContent = medal ? MEDAL_LABELS[medal].toUpperCase() : "NO MEDAL YET";
-  const lead = game.status === "won" && !game.level.secret ? `${TRAILS[index].name} ${formatTime(ms)} · ` : "";
+  const lead = game.status === "won" && !game.level.secret && !game.level.bonus ? `${TRAILS[index].name} ${formatTime(ms)} · ` : "";
   const goal = next ? `${MEDAL_LABELS[next.medal]} under ${formatTime(next.ms)}` : "Top dog time!";
   $("medal-detail").textContent = `${lead}Best ${formatTime(best ?? ms)} · ${goal}`;
   $("new-best").hidden = !newBest;
@@ -492,10 +501,12 @@ const padlockMarkup = '<svg class="padlock" viewBox="0 0 12 14" aria-hidden="tru
 let trailLayout = null;
 
 const stopNumber = (index) => index === SECRET_INDEX ? "★" : String(index + 1).padStart(2, "0");
-const stopName = (index) => index === SECRET_INDEX ? `Secret trail, ${TRAILS[index].name}` : `Trail ${stopNumber(index)}, ${TRAILS[index].name}`;
+const stopName = (index) => index === SECRET_INDEX ? `Secret trail, ${TRAILS[index].name}` : `Trail ${stopNumber(index)}${index === BONUS_INDEX ? " bonus" : ""}, ${TRAILS[index].name}`;
+// The campaign plus the bonus Trail 08 (padlocked until Moonlit Keep is beaten).
+const MAP_TRAILS = LEVELS.length + 1;
 
-// The map shows the campaign, plus the secret trail's stop once it has been found.
-function buildTrailMap(count = LEVELS.length) {
+// The map shows the campaign and Trail 08, plus the secret trail's stop once it has been found.
+function buildTrailMap(count = MAP_TRAILS) {
   if (trailLayout?.stops.length === count) return;
   trailLayout = trailPath(count);
   const svgNs = "http://www.w3.org/2000/svg";
@@ -515,7 +526,7 @@ function buildTrailMap(count = LEVELS.length) {
     item.style.left = `${(x / 480) * 100}%`;
     item.style.top = `${(y / 256) * 100}%`;
     button.type = "button";
-    button.className = level.secret ? "trail-stop secret" : "trail-stop";
+    button.className = level.secret ? "trail-stop secret" : level.bonus ? "trail-stop bonus" : "trail-stop";
     button.dataset.stop = String(index);
     button.style.setProperty("--stop-fill", fill);
     button.style.setProperty("--stop-ring", ring);
@@ -547,7 +558,7 @@ function syncTrailMap() {
     const open = isStopOpen(trailMap, index);
     const best = bestTimes[index];
     const medal = best === null ? null : medalFor(best, TRAILS[index].par);
-    const cleared = index < trailMap.unlocked - 1 || best !== null;
+    const cleared = (index < LEVELS.length && index < trailMap.unlocked - 1) || best !== null;
     const selected = index === trailMap.selected;
     button.classList.toggle("locked", !open);
     button.classList.toggle("selected", selected);
@@ -567,10 +578,12 @@ function syncTrailMap() {
   }
   const selected = trailMap.selected;
   const best = bestTimes[selected];
-  const state = !isStopOpen(trailMap, selected) ? "LOCKED" : selected < trailMap.unlocked - 1 || best !== null ? "CLEARED" : "OPEN";
+  const open = isStopOpen(trailMap, selected);
+  const state = !open ? selected === BONUS_INDEX ? "LOCKED · BEAT MOONLIT KEEP TO OPEN" : "LOCKED"
+    : (selected < LEVELS.length && selected < trailMap.unlocked - 1) || best !== null ? "CLEARED" : "OPEN";
   const medal = best === null ? null : medalFor(best, TRAILS[selected].par);
   const record = best === null ? "" : ` · BEST ${formatTime(best)} · ${medal ? MEDAL_LABELS[medal].toUpperCase() : "NO MEDAL YET"}`;
-  const heading = selected === SECRET_INDEX ? "SECRET TRAIL" : `TRAIL ${stopNumber(selected)}`;
+  const heading = selected === SECRET_INDEX ? "SECRET TRAIL" : `TRAIL ${stopNumber(selected)}${selected === BONUS_INDEX ? " · BONUS" : ""}`;
   $("trail-map-status").textContent = `${heading} · ${TRAILS[selected].name.toUpperCase()} · ${state}${record}`;
 }
 
@@ -596,18 +609,22 @@ function focusSelectedStop() {
   $("trail-map-stops").querySelector(`[data-stop="${trailMap.selected}"]`)?.focus({ preventScroll: true });
 }
 
-// Adds (or removes) the secret stop when another tab changes the saved times, keeping the selection and focus.
+// Adds (or removes) the secret stop and opens Trail 08 when another tab changes the saved times, keeping the selection and focus.
 function refreshTrailMap() {
   const secret = secretTrailOpen(bestTimes, LEVELS);
-  if (secret !== trailMap.secret) {
+  const bonusOpen = bonusTrailOpen(bestTimes, LEVELS);
+  if (secret !== trailMap.secret || bonusOpen !== trailMap.bonusOpen) {
     const focused = $("trail-map-stops").contains(document.activeElement);
-    buildTrailMap(LEVELS.length + (secret ? 1 : 0));
+    buildTrailMap(MAP_TRAILS + (secret ? 1 : 0));
     const { selected } = trailMap;
-    trailMap = createTrailMap(trailMap.unlocked, LEVELS.length, selected, { secret });
+    const revealed = secret && !trailMap.secret;
+    const opened = bonusOpen && !trailMap.bonusOpen;
+    trailMap = createTrailMap(trailMap.unlocked, LEVELS.length, selected, { secret, bonus: true, bonusOpen });
     // Keep the selected stop (even a locked one) if it is still on the map; only a removed secret stop falls back.
     if (selected < trailMap.total) trailMap.selected = selected;
     if (focused) focusSelectedStop();
-    if (secret) announce(`A secret trail appeared on the Trail Map: ${SECRET_TRAIL.name}!`);
+    if (opened) announce(`Trail 08, ${BONUS_TRAIL.name}, opened on the Trail Map!`);
+    else if (revealed) announce(`A secret trail appeared on the Trail Map: ${SECRET_TRAIL.name}!`);
   }
   syncTrailMap();
 }
@@ -618,13 +635,14 @@ function openTrailMap() {
   latestUnlocked();
   latestBestTimes();
   const secret = secretTrailOpen(bestTimes, LEVELS);
-  buildTrailMap(LEVELS.length + (secret ? 1 : 0));
-  trailMap = createTrailMap(unlockedTrails, LEVELS.length, game.status === "ready" ? unlockedTrails - 1 : game.startIndex, { secret });
+  const bonusOpen = bonusTrailOpen(bestTimes, LEVELS);
+  buildTrailMap(MAP_TRAILS + (secret ? 1 : 0));
+  trailMap = createTrailMap(unlockedTrails, LEVELS.length, game.status === "ready" ? unlockedTrails - 1 : game.startIndex, { secret, bonus: true, bonusOpen });
   syncTrailMap();
   $("trail-map").hidden = false;
   setBackgroundInert(true);
   focusSelectedStop();
-  announce(`Trail map. ${unlockedTrails} of ${LEVELS.length} trails open${secret ? `, plus the secret trail ${SECRET_TRAIL.name}` : ""}. Use the arrow keys to choose a trail.`);
+  announce(`Trail map. ${unlockedTrails + (bonusOpen ? 1 : 0)} of ${MAP_TRAILS} trails open${secret ? `, plus the secret trail ${SECRET_TRAIL.name}` : ""}. Use the arrow keys to choose a trail.`);
 }
 
 function closeTrailMap({ restoreFocus = true } = {}) {

@@ -8,7 +8,7 @@ export const VIEW_WIDTH = 480;
 export const VIEW_HEIGHT = 256;
 export const GROUND_Y = 208;
 
-function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null, ice = [], secret = false, record }) {
+function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null, ice = [], secret = false, bonus = false, record }) {
   if (!Array.isArray(par) || par.length !== 3 || !par.every((seconds, index) => Number.isFinite(seconds) && seconds > (par[index - 1] ?? 0))) {
     throw new Error(`${name}: par must be [gold, silver, bronze] seconds in increasing order`);
   }
@@ -30,9 +30,11 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     ground,
     gaps: gaps.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
     // A fourth "ice" entry glazes a platform, leaving one grippy tile at each end so the pup never slides off an edge.
+    // A fourth "hay" entry makes it a row of springy hay bales (see HAY in engine.js).
     platforms: platforms.map(([x, y, w, surface]) => ({
       x: x * TILE, y: y * TILE, w: w * TILE, h: TILE,
       ice: surface === "ice" ? { x: (x + 1) * TILE, w: (w - 2) * TILE } : null,
+      ...(surface === "hay" ? { hay: true } : {}),
     })),
     // [column, width] stretches of slippery ice on the ground.
     ice: ice.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
@@ -56,6 +58,7 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     exit: { x: (columns - 6) * TILE, y: GROUND_Y - 32, w: 32, h: 32 },
     // A boss guards an arena between two columns and drops the golden key when beaten.
     secret,
+    bonus,
     // `kind: "yeti"` picks the Grumpy Yeti, which also needs to know where the arena's ice is.
     boss: boss && (boss.kind === "yeti"
       ? makeYeti({ x: boss.x * TILE, left: boss.left * TILE, right: boss.right * TILE, floor: GROUND_Y, ice: ice.map(([x, w]) => ({ x: x * TILE, w: w * TILE })) })
@@ -199,6 +202,39 @@ export const SECRET_TRAIL = trail({
   boss: { kind: "yeti", x: 151, left: 140, right: 164 },
 });
 
-// Every playable trail: the campaign, then the secret trail at index `SECRET_INDEX`.
-export const SECRET_INDEX = LEVELS.length;
-export const TRAILS = [...LEVELS, SECRET_TRAIL];
+// Trail 08, a bonus trail after the campaign. It opens once Moonlit Keep has been beaten (see
+// `bonusTrailOpen` in trailmap.js), so the Mega-Vac stays the finale. Springy hay bales send the pup
+// soaring; the golden key waits in a hayloft that only a hay-bale jump can reach.
+export const BONUS_TRAIL = trail({
+  name: "Harvest Hollow", theme: "autumn", columns: 172, par: [32, 44, 66], bonus: true,
+  // Before the Yeti, Frosty Fjord saved its times under "8", so Trail 08 needs a key of its own.
+  record: "8-harvest",
+  gaps: [[18, 3], [40, 4], [60, 3], [82, 4], [104, 3], [126, 4], [146, 3]],
+  platforms: [
+    [8, 11, 3], [12, 11, 3, "hay"], [23, 11, 4], [28, 9, 3], [33, 11, 3, "hay"], [34, 6, 4],
+    [46, 11, 3], [50, 9, 3], [54, 7, 3], [66, 11, 6], [74, 9, 3], [78, 11, 3, "hay"],
+    // The hayloft with the golden key, high above a bale cart past the checkpoint.
+    [91, 11, 3, "hay"], [92, 6, 4], [109, 11, 4], [114, 9, 3], [118, 11, 3],
+    // A bale cart parked over the duck pond, with a treat loft above it.
+    [126, 11, 4, "hay"], [127, 6, 3], [133, 11, 3], [138, 9, 3], [152, 11, 4], [158, 10, 3],
+  ],
+  treats: [
+    [5, 188], [9, 164], [13, 84], [14, 84], [16, 188], [24, 164], [25, 164], [29, 132], [35, 80], [36, 80],
+    [47, 164], [51, 132], [52, 132], [54, 96], [57, 188], [67, 164], [69, 164], [75, 132], [79, 84], [80, 84],
+    [87, 188], [93, 80], [95, 80], [110, 164], [111, 164], [115, 132], [116, 132], [119, 164], [128, 80], [129, 80],
+    [134, 164], [139, 132], [140, 132], [150, 188], [153, 164], [154, 164], [159, 148], [160, 148], [164, 188],
+  ],
+  powerups: [["bone", 55, 96], ["squeaky", 64, 188], ["zoomies", 112, 156]],
+  key: [94, 80], checkpoint: 88,
+  spikes: [[31, 1], [57, 1], [73, 1], [99, 1], [122, 1], [143, 1]],
+  enemies: [
+    [48, 47, 52, 22], [112, 111, 116, 26], [136, 135, 139, 28], [152, 150, 155, 26],
+    { type: "cat", x: 66, left: 66, right: 70.875, speed: 20, row: 11 },
+    { type: "seagull", x: 118, left: 117, right: 124, speed: 24 },
+  ],
+});
+
+// Every playable trail: the campaign, the bonus trail at `BONUS_INDEX`, then the secret trail at `SECRET_INDEX`.
+export const BONUS_INDEX = LEVELS.length;
+export const SECRET_INDEX = LEVELS.length + 1;
+export const TRAILS = [...LEVELS, BONUS_TRAIL, SECRET_TRAIL];
