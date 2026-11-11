@@ -22,6 +22,8 @@ const bark = (at, pitch = 1, gain = 0.07) => [
 
 export const SOUND_RECIPES = Object.freeze({
   jump: [voice("square", 300, 640, 0, 0.12, 0.04)],
+  // A springy "boing" off a hay bale: a jump sound that wobbles up twice as far.
+  "hay-jump": [voice("sine", 180, 720, 0, 0.18, 0.06), voice("square", 300, 900, 0.03, 0.14, 0.025)],
   land: [voice("sine", 140, 60, 0, 0.07, 0.05), voice("noise", 1, 1, 0, 0.03, 0.012)],
   treat: [voice("triangle", 988, 988, 0, 0.06, 0.06), voice("triangle", 1480, 1480, 0.055, 0.12, 0.06)],
   key: notes("square", [523, 659, 784, 1046], 0.07, 0.035),

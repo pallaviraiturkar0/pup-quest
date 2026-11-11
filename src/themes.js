@@ -11,9 +11,9 @@ export const PALETTE_KEYS = [
   "dirtDark", "stone", "water", "waterLight", "flower",
 ];
 
-export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps", "aurora", "glaciers", "snow"];
-export const SCATTER_KINDS = ["rock", "mushroom", "shell", "snowdrift"];
-export const LANDMARK_KINDS = ["tree", "stump", "pillar", "palm", "bench", "hydrant", "snowman"];
+export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps", "aurora", "glaciers", "snow", "harvest", "leaves"];
+export const SCATTER_KINDS = ["rock", "mushroom", "shell", "snowdrift", "pumpkin"];
+export const LANDMARK_KINDS = ["tree", "stump", "pillar", "palm", "bench", "hydrant", "snowman", "scarecrow"];
 
 const DAY_SUN = { kind: "sun", parallax: 0.025, color: "#f5e8aa", halo: "#dce5c2" };
 const NIGHT_MOON = { kind: "moon", parallax: 0.025, color: "#ede9c8", halo: "#626687", shadow: "#68718d", crater: "#d2d4b6" };
@@ -155,6 +155,30 @@ export const THEMES = {
       { kind: "snow", parallax: 0.45, count: 70, color: "#f5f9ff" },
     ],
     decor: { scatter: "snowdrift", landmark: "snowman", flowers: false },
+  },
+  autumn: {
+    label: "Harvest hollow",
+    palette: {
+      sky: "#f0b78f", horizon: "#f9dca6", cloud: "#fbe4c6", cloudShade: "#efc2a2",
+      far: "#c99487", hill: "#b88563", treeBack: "#c4683d", tree: "#b0472f",
+      treeLight: "#e3913f", trunk: "#6b4835", grass: "#b8a35a", grassLight: "#dbc77d",
+      grassDark: "#887640", dirt: "#9a6a46", dirtLight: "#b38158", dirtDark: "#785037",
+      stone: "#a38b76", water: "#6f8ea1", waterLight: "#aac3ca", flower: "#e98f3a",
+    },
+    layers: [
+      // A big, low sunset sun with geese heading south across it.
+      { kind: "sun", parallax: 0.02, color: "#fbd27a", halo: "#f4a46c", top: 62 },
+      { ...CLOUDS, count: 5 },
+      { kind: "birds", parallax: 0.14, count: 6, color: "#6f4b4b" },
+      FAR_HILLS,
+      NEAR_HILLS,
+      // Round trees in a mix of red, orange, and gold canopies.
+      { kind: "trees", parallax: 0.3, style: "autumn", colors: ["#b0472f", "#d0662f", "#e3a13c", "#c4683d"] },
+      // Hay bales and a pumpkin patch along the field's edge.
+      { kind: "harvest", parallax: 0.4, spacing: 64, hay: "#e2bf62", twine: "#a7783a", pumpkin: "#e2772c", stem: "#5f6b33" },
+      { kind: "leaves", parallax: 0.5, count: 34, colors: ["#d0562f", "#e88a35", "#f0bb48", "#a8432c"] },
+    ],
+    decor: { scatter: "pumpkin", landmark: "scarecrow" },
   },
 };
 

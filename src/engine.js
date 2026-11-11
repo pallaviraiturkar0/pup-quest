@@ -20,6 +20,10 @@ export const PHYSICS = Object.freeze({
 // At full speed a pup slides about 1.4 tiles after letting go: noticeable, never a trap.
 export const ICE = Object.freeze({ traction: 0.3 });
 
+// Hay bales are springy: a jump that starts on one goes much higher (about five tiles instead of three).
+// Releasing jump early still cuts it short, so a little hop off a bale stays easy.
+export const HAY = Object.freeze({ jump: 340 });
+
 export function intersects(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -28,7 +32,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const approach = (value, target, amount) => value < target ? Math.min(value + amount, target) : Math.max(value - amount, target);
 
 function playerAt(x, y) {
-  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, onIce: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0 };
+  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, onIce: false, onHay: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0 };
 }
 
 function loadLevel(game) {
@@ -175,11 +179,12 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   p.vx = approach(p.vx, direction * PHYSICS.speed * speedMultiplier(p), PHYSICS.acceleration * grip * dt);
   if (direction) p.facing = direction;
   if (p.buffer > 0 && p.coyote > 0) {
-    p.vy = -PHYSICS.jump;
+    const hay = p.grounded && p.onHay;
+    p.vy = -(hay ? HAY.jump : PHYSICS.jump);
     p.grounded = false;
     p.coyote = 0;
     p.buffer = 0;
-    game.events.push({ type: "jump", x: p.x + p.w / 2, y: p.y + p.h });
+    game.events.push({ type: hay ? "hay-jump" : "jump", x: p.x + p.w / 2, y: p.y + p.h });
   }
   if (!input.jumpHeld && p.vy < -PHYSICS.shortJump) p.vy = -PHYSICS.shortJump;
   p.vy = Math.min(PHYSICS.maxFall, p.vy + PHYSICS.gravity * dt);
@@ -197,6 +202,7 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   const impactSpeed = p.vy;
   p.grounded = false;
   p.onIce = false;
+  p.onHay = false;
   for (const surface of [...level.ground, ...level.platforms]) {
     if (p.vy >= 0 && previousBottom <= surface.y + 0.1 &&
         p.y + p.h >= surface.y && p.x + p.w > surface.x && p.x < surface.x + surface.w) {
@@ -204,6 +210,7 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
       p.vy = 0;
       p.grounded = true;
       p.onIce ||= iceUnder(level, surface, p);
+      p.onHay ||= Boolean(surface.hay);
     }
   }
   p.stride += Math.abs(p.vx) * dt;
@@ -256,8 +263,8 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   if (intersects(p, level.exit)) {
     if (game.keyFound) {
       game.score += game.lives * 50;
-      // The finale, the secret trail, a Daily Walk and a built trail all end the run; other trails lead on to the next.
-      game.status = level.secret || level.daily || level.built || game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
+      // The finale, the bonus and secret trails, a Daily Walk and a built trail all end the run; other trails lead on to the next.
+      game.status = level.bonus || level.secret || level.daily || level.built || game.levelIndex === LEVELS.length - 1 ? "won" : "level-complete";
       game.events.push({ type: game.status, x: level.exit.x + level.exit.w / 2, y: level.exit.y });
     } else if (game.exitHintCooldown === 0) {
       game.exitHintCooldown = 3;

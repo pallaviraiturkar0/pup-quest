@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  chooseTrail, contrastRatio, createTrailMap, isStopOpen, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, secretTrailOpen, stopColors,
+  bonusTrailOpen, chooseTrail, contrastRatio, createTrailMap, isStopOpen, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, secretTrailOpen, stopColors,
   trailPath, unlockAfterClear,
 } from "../src/trailmap.js";
 import { createGame, nextLevel, restartGame, startGame } from "../src/engine.js";
-import { LEVELS, SECRET_INDEX } from "../src/levels.js";
+import { BONUS_INDEX, LEVELS, SECRET_INDEX } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
 
 const TOTAL = LEVELS.length;
@@ -128,17 +128,41 @@ test("the secret trail opens after beating the Mega-Vac or earning any gold paw"
 });
 
 test("once found, the secret trail is an extra open stop on the map, even with campaign trails still locked", () => {
-  const hidden = createTrailMap(2, TOTAL);
-  assert.equal(hidden.total, TOTAL);
+  const hidden = createTrailMap(2, TOTAL, 1, { bonus: true });
+  assert.equal(hidden.total, TOTAL + 1, "the map shows the campaign and Trail 08");
   assert.equal(chooseTrail(hidden, SECRET_INDEX), null);
-  const map = createTrailMap(2, TOTAL, 1, { secret: true });
-  assert.equal(map.total, TOTAL + 1);
+  const map = createTrailMap(2, TOTAL, 1, { bonus: true, secret: true });
+  assert.equal(map.total, TOTAL + 2);
+  assert.equal(map.secretIndex, SECRET_INDEX);
   assert.equal(isStopOpen(map, SECRET_INDEX), true);
   assert.equal(isStopOpen(map, 2), false, "finding the secret never opens campaign trails");
+  assert.equal(isStopOpen(map, BONUS_INDEX), false, "or Trail 08");
   assert.equal(chooseTrail(map, SECRET_INDEX), SECRET_INDEX);
   moveSelection(map, "End");
   assert.equal(map.selected, SECRET_INDEX);
-  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { secret: true }).selected, SECRET_INDEX, "replaying it reopens the map on its stop");
-  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX).selected, 1, "a hidden secret falls back to the furthest open trail");
-  assert.equal(trailPath(TOTAL + 1).stops.length, TOTAL + 1);
+  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: true, secret: true }).selected, SECRET_INDEX, "replaying it reopens the map on its stop");
+  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: true }).selected, 1, "a hidden secret falls back to the furthest open trail");
+  assert.equal(createTrailMap(2, TOTAL, TOTAL, { secret: true }).selected, TOTAL, "without a bonus stop the secret follows the campaign");
+  assert.equal(trailPath(TOTAL + 2).stops.length, TOTAL + 2);
+});
+
+test("Trail 08 opens after Moonlit Keep is beaten, including for saves made before it existed, and never re-locks the campaign", () => {
+  const times = (entries = {}) => Array.from({ length: SECRET_INDEX + 1 }, (_, index) => entries[index] ?? null);
+  assert.equal(bonusTrailOpen(times(), LEVELS), false, "a fresh save keeps it locked");
+  assert.equal(bonusTrailOpen(null, LEVELS), false);
+  assert.equal(bonusTrailOpen(times({ 2: LEVELS[2].par.gold * 1000 }), LEVELS), false, "a gold paw opens the secret trail, not Trail 08");
+  assert.equal(bonusTrailOpen(times({ [TOTAL - 1]: -1 }), LEVELS), false, "tampered times are ignored");
+  assert.equal(bonusTrailOpen(times({ [BONUS_INDEX]: 50_000 }), LEVELS), false, "its own time cannot open it");
+  // An older save: all seven trails open and a Moonlit Keep time under its "7" key.
+  const veteran = times({ [TOTAL - 1]: 61_000 });
+  assert.equal(bonusTrailOpen(veteran, LEVELS), true);
+  assert.equal(parseUnlocked(String(TOTAL), TOTAL), TOTAL, "the saved unlock count still reads the same");
+  const map = createTrailMap(TOTAL, TOTAL, BONUS_INDEX, { bonus: true, bonusOpen: true, secret: true });
+  assert.equal(map.selected, BONUS_INDEX, "replaying Trail 08 reopens the map on its stop");
+  assert.equal(chooseTrail(map, BONUS_INDEX), BONUS_INDEX);
+  for (let index = 0; index < TOTAL; index += 1) assert.equal(isStopOpen(map, index), true);
+  const locked = createTrailMap(TOTAL, TOTAL, BONUS_INDEX, { bonus: true, secret: true });
+  assert.equal(chooseTrail(locked, BONUS_INDEX), null, "Trail 08 shows a padlock until the Mega-Vac is beaten");
+  assert.equal(locked.selected, TOTAL - 1, "a locked Trail 08 falls back to the finale");
+  assert.equal(unlockAfterClear(TOTAL, TOTAL - 1, TOTAL), TOTAL, "clearing the finale keeps the campaign unlock count in range");
 });

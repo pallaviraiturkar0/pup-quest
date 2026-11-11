@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame } from "../src/engine.js";
-import { LEVELS, SECRET_INDEX, SECRET_TRAIL, VIEW_WIDTH } from "../src/levels.js";
+import { BONUS_INDEX, BONUS_TRAIL, LEVELS, SECRET_INDEX, SECRET_TRAIL, VIEW_WIDTH } from "../src/levels.js";
 import { createRenderer } from "../src/render.js";
 import {
   DEFAULT_THEME, getTheme, LANDMARK_KINDS, LAYER_KINDS, PALETTE_KEYS, resolveColor,
@@ -52,6 +52,37 @@ test("snow falls over time but holds still with reduced motion", () => {
   };
   assert.notEqual(flakesAt(1, false), flakesAt(3, false));
   assert.equal(flakesAt(1, true), flakesAt(3, true));
+});
+
+test("the autumn theme brings a sunset, autumn trees, a hay-bale and pumpkin harvest, and falling leaves", () => {
+  assert.equal(themeForLevel(BONUS_TRAIL), THEMES.autumn);
+  const kinds = THEMES.autumn.layers.map((layer) => layer.kind);
+  for (const kind of ["sun", "trees", "harvest", "leaves"]) assert.ok(kinds.includes(kind), kind);
+  assert.equal(THEMES.autumn.layers.find((layer) => layer.kind === "trees").style, "autumn");
+  const leaves = THEMES.autumn.layers.find((layer) => layer.kind === "leaves");
+  assert.ok(leaves.colors.length >= 3 && leaves.colors.every((color) => HEX.test(resolveColor(THEMES.autumn, color))));
+  assert.deepEqual(THEMES.autumn.decor, { scatter: "pumpkin", landmark: "scarecrow" });
+});
+
+test("autumn leaves drift over time but hold still with reduced motion", () => {
+  const leaf = resolveColor(THEMES.autumn, THEMES.autumn.layers.find((layer) => layer.kind === "leaves").colors[0]);
+  const leavesAt = (time, reducedMotion) => {
+    const spots = [];
+    let fill = "";
+    const noop = () => {};
+    const ctx = {
+      globalAlpha: 1, font: "", imageSmoothingEnabled: false,
+      set fillStyle(value) { fill = value; }, get fillStyle() { return fill; },
+      fillRect(x, y) { if (fill === leaf) spots.push(`${x},${y}`); },
+      beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop,
+      save: noop, restore: noop, translate: noop, scale: noop, fillText: noop,
+    };
+    createRenderer({ getContext: () => ctx }).render(createGame(BONUS_INDEX), time, 0, reducedMotion);
+    return spots.join(" ");
+  };
+  assert.notEqual(leavesAt(1, false), "", "leaves are drawn");
+  assert.notEqual(leavesAt(1, false), leavesAt(3, false));
+  assert.equal(leavesAt(1, true), leavesAt(3, true));
 });
 
 test("ice is drawn on the secret trail's slippery ground and ledges", () => {

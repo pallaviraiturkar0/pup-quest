@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createGame, ICE, iceUnder, intersects, nextLevel, pauseGame, PHYSICS, restartGame, resumeGame, startGame, stepGame } from "../src/engine.js";
-import { GROUND_Y, LEVELS, SECRET_INDEX, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "../src/levels.js";
+import { createGame, HAY, ICE, iceUnder, intersects, nextLevel, pauseGame, PHYSICS, restartGame, resumeGame, startGame, stepGame } from "../src/engine.js";
+import { BONUS_INDEX, GROUND_Y, LEVELS, SECRET_INDEX, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "../src/levels.js";
 
 const tick = (game, input = {}) => stepGame(game, input, 1 / 120);
 function playing() {
@@ -309,6 +309,71 @@ test("ice only affects grip on the ground, never in the air or on ordinary trail
     tick(meadow);
     assert.equal(meadow.player.onIce, false, trail.name);
   }
+});
+
+function onBale(hay) {
+  const game = createGame(BONUS_INDEX);
+  startGame(game);
+  tick(game);
+  const bale = game.level.platforms.find((platform) => platform.hay);
+  const ledge = game.level.platforms.find((platform) => !platform.hay && platform.y === bale.y);
+  const surface = hay ? bale : ledge;
+  place(game, surface.x + 8, surface.y - game.player.h);
+  for (let i = 0; i < 20; i += 1) tick(game);
+  assert.equal(game.player.grounded, true);
+  game.events.length = 0;
+  return game;
+}
+
+function leap(game, hold) {
+  const start = game.player.y;
+  let top = start;
+  const events = [];
+  for (let i = 0; i < 150; i += 1) {
+    tick(game, { jumpPressed: i === 0, jumpHeld: hold || i === 0 });
+    events.push(...game.events.splice(0).map((event) => event.type));
+    top = Math.min(top, game.player.y);
+  }
+  return { height: start - top, events };
+}
+
+test("hay bales launch a much higher jump, with a boing of straw instead of the usual hop", () => {
+  const hay = onBale(true);
+  assert.equal(hay.player.onHay, true);
+  const bounce = leap(hay, true);
+  const expected = HAY.jump ** 2 / (2 * PHYSICS.gravity);
+  assert.ok(Math.abs(bounce.height - expected) < 3, `hay jump height ${bounce.height}`);
+  assert.ok(bounce.height > 80, "high enough to reach a hayloft five tiles up");
+  assert.ok(bounce.events.includes("hay-jump") && !bounce.events.includes("jump"));
+  const plain = leap(onBale(false), true);
+  assert.equal(plain.events.includes("hay-jump"), false);
+  assert.ok(plain.height > 48 && plain.height < 53, `an ordinary ledge keeps the normal jump (${plain.height})`);
+  assert.ok(bounce.height > plain.height + 30);
+});
+
+test("a tapped jump off a hay bale is still short, and the bounce only works from the bale itself", () => {
+  const tap = leap(onBale(true), false);
+  assert.ok(tap.height < 40, `tapping jump cuts the bounce short (${tap.height})`);
+  const game = onBale(true);
+  tick(game, { jumpPressed: true, jumpHeld: true });
+  assert.equal(game.player.onHay, false, "airborne, the pup is off the hay");
+  // Landing back on ordinary ground clears the bounce.
+  place(game, game.level.spawn?.x ?? 40, GROUND_Y - game.player.h);
+  for (let i = 0; i < 10; i += 1) tick(game);
+  assert.equal(game.player.onHay, false);
+  assert.ok(TRAILS.every((trail, index) => index === BONUS_INDEX || trail.platforms.every((platform) => !platform.hay)));
+});
+
+test("clearing the bonus Trail 08 ends the run without wrapping into the campaign or the secret trail", () => {
+  const game = createGame(BONUS_INDEX);
+  assert.equal(game.level.name, "Harvest Hollow");
+  startGame(game);
+  finish(game);
+  assert.equal(game.status, "won");
+  nextLevel(game);
+  assert.equal(game.levelIndex, BONUS_INDEX);
+  restartGame(game);
+  assert.equal(game.levelIndex, BONUS_INDEX, "trying again replays Trail 08");
 });
 
 test("clearing the secret trail ends the run without wrapping into the campaign", () => {

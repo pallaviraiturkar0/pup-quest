@@ -26,22 +26,40 @@ export function isUnlocked(index, unlocked) {
   return Number.isInteger(index) && index >= 0 && index < unlocked;
 }
 
-// The secret trail opens once the finale is cleared (beating the boss records its time) or any
-// campaign trail earns a gold paw. It is derived from saved best times, so it never needs its own key.
-export function secretTrailOpen(bestTimes, levels) {
+// Beating the boss finale records its time, so a saved finale time means the campaign is won.
+export function finaleCleared(bestTimes, levels) {
   const finale = bestTimes?.[levels.length - 1];
-  if (Number.isSafeInteger(finale) && finale > 0) return true;
+  return Number.isSafeInteger(finale) && finale > 0;
+}
+
+// The bonus Trail 08 opens once the finale is cleared. Like the secret trail it is derived from saved
+// best times, so players who beat Moonlit Keep before it existed find it already open.
+export function bonusTrailOpen(bestTimes, levels) {
+  return finaleCleared(bestTimes, levels);
+}
+
+// The secret trail opens once the finale is cleared or any campaign trail earns a gold paw.
+// It is derived from saved best times, so it never needs its own key.
+export function secretTrailOpen(bestTimes, levels) {
+  if (finaleCleared(bestTimes, levels)) return true;
   return levels.some((level, index) => medalFor(bestTimes?.[index], level.par) === "gold");
 }
 
-// `total` counts the campaign trails. With `secret`, one extra stop (index `total`) joins the map.
-export function createTrailMap(unlocked, total, preferred = unlocked - 1, { secret = false } = {}) {
-  const selected = secret && preferred === total ? total : Math.min(Math.max(preferred, 0), Math.max(unlocked - 1, 0));
-  return { unlocked, total: total + (secret ? 1 : 0), trails: total, secret, selected };
+// `total` counts the campaign trails. With `bonus`, the bonus trail's stop (index `total`) joins the
+// map, open only once `bonusOpen`; with `secret`, the secret trail's stop follows as the last stop.
+export function createTrailMap(unlocked, total, preferred = unlocked - 1, { secret = false, bonus = false, bonusOpen = false } = {}) {
+  const bonusIndex = bonus ? total : null;
+  const secretIndex = secret ? total + (bonus ? 1 : 0) : null;
+  const map = { unlocked, total: total + (bonus ? 1 : 0) + (secret ? 1 : 0), trails: total, secret, secretIndex, bonus, bonusOpen: bonus && bonusOpen, bonusIndex, selected: 0 };
+  const extraOpen = preferred === secretIndex || (preferred === bonusIndex && map.bonusOpen);
+  map.selected = extraOpen ? preferred : Math.min(Math.max(preferred, 0), Math.max(unlocked - 1, 0));
+  return map;
 }
 
 export function isStopOpen(map, index) {
-  return map.secret && index === map.trails ? true : isUnlocked(index, map.unlocked);
+  if (map.secret && index === map.secretIndex) return true;
+  if (map.bonus && index === map.bonusIndex) return map.bonusOpen;
+  return isUnlocked(index, map.unlocked);
 }
 
 // Arrows walk every stop (locked ones too, so their padlock can be read out) and stop at the ends.

@@ -145,13 +145,15 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .beach-icon { color: #b9a386; }
 .city-icon { color: #9f9cae; }
 .castle-icon { color: #8f8aa8; }
+.autumn-icon { color: #b8906a; }
 .trail.active .forest-icon { color: #718a66; }
 .trail.active .night-icon { color: #9392b8; }
 .trail.active .park-icon { color: #5f9a5c; }
 .trail.active .beach-icon { color: #6fb3c2; }
 .trail.active .city-icon { color: #c9a94f; }
 .trail.active .castle-icon { color: #d0596b; }
-.trail.finale { grid-column: 1 / -1; }
+.trail.active .autumn-icon { color: #d9772e; }
+.trail.finale, .trail.bonus { grid-column: 1 / -1; }
 .trail-state { color: #a4b593; margin-left: auto; font-size: 10px; }
 .below-game { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0 26px; }
 .below-game p { font-size: 10px; color: #929785; margin: 0; }
@@ -207,6 +209,7 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
 .trail-stop.secret { box-shadow: 0 0 0 3px #a7d3ea80, 0 0 14px 4px #79c9ff99; }
 .trail-stop.secret.selected { box-shadow: 0 0 0 3px #fffdf0, 0 0 0 6px #79c9ff, 0 0 16px 6px #6ff0bf88; }
 .trail-stop.secret .trail-stop-label { color: #2b4a6b; }
+.trail-stop.bonus:not(.locked, .selected) { box-shadow: 0 0 0 3px #f2c27a80, 0 0 12px 3px #e8873a88; }
 @keyframes paw-hop { 50% { transform: translateY(-3px); } }
 .trail-stop-label { position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%); white-space: nowrap; font: 600 8px var(--mono); letter-spacing: .5px; color: #4d5c45; background: #fffdf0e6; padding: 2px 4px; border-radius: 2px; pointer-events: none; }
 .trail-stop.locked .trail-stop-label { color: #5f6656; }

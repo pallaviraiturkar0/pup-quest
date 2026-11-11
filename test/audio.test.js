@@ -33,7 +33,7 @@ const memoryStorage = (initial = {}) => {
 };
 
 test("every effect the game asks for has a short, valid recipe", () => {
-  for (const type of ["jump", "land", "treat", "key", "checkpoint", "stomp", "powerup", "hurt", "start", "level-complete", "game-over", "won", "boss-wake", "boss-crash", "boss-bonk", "boss-hit", "boss-defeated"]) {
+  for (const type of ["jump", "land", "treat", "key", "checkpoint", "stomp", "powerup", "hurt", "start", "level-complete", "game-over", "won", "boss-wake", "boss-crash", "boss-bonk", "boss-hit", "boss-defeated", "hay-jump"]) {
     const recipe = soundRecipe(type);
     assert.ok(recipe?.length > 0, `${type} has a sound`);
     assert.ok(recipeDuration(recipe) > 0 && recipeDuration(recipe) < 1.5, `${type} is short`);
