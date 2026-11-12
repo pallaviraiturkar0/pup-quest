@@ -65,6 +65,10 @@ test("only recent runs are kept, and long streaks count in full past the window"
   const joined = walk(["2026-04-12", "2026-04-11"], saved).state;
   assert.equal(joined.current, 102);
   assert.equal(joined.best, 102);
+  // Walking the window's oldest day late still joins the run that ended just before it.
+  const boundary = walk([...range("2026-04-12", 59), "2026-04-11"], saved).state;
+  assert.equal(boundary.current, 160);
+  assert.equal(boundary.best, 160);
   const later = walk(["2026-07-01", "2026-07-02"], saved);
   assert.deepEqual(later.state.runs, [["2026-07-01", "2026-07-02"]], "runs that ended before the window are dropped");
   assert.equal(later.state.best, 100, "the best survives");

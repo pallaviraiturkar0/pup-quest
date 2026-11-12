@@ -442,7 +442,9 @@ function startDailyWalk() {
 
 function dailyResultText(walk, run) {
   const best = run?.newBest ? "That's your best time today." : run?.best ? `Today's best is ${formatTime(run.best)}.` : "";
-  const streak = run?.streak ? ` ${dayCount(run.streak.current)} in a row (best ${dayCount(run.streak.best)}).` : "";
+  const streak = !run?.streak ? "" : run.streak.current
+    ? ` ${dayCount(run.streak.current)} in a row (best ${dayCount(run.streak.best)}).`
+    : ` Best streak: ${dayCount(run.streak.best)}.`;
   return `${walk.title}, conquered! ${best}${streak} A brand-new walk arrives at midnight UTC.`;
 }
 
@@ -481,7 +483,9 @@ function recordDailyClear() {
 // preview at once, then the streak saved under the cross-tab lock, which another tab may have changed.
 function recordDailyStreak(date, run) {
   const preview = commitStreak(savedPreference(DAILY_STREAK_KEY), date);
-  run.streak = { current: preview.state.current, best: preview.state.best };
+  // A walk finished a day or more after it began may already be too late to keep the streak alive.
+  const shown = ({ state }) => ({ current: activeStreak(state, utcDateKey()), best: state.best });
+  run.streak = shown(preview);
   if (!preview.added) return;
   withSaveLock(navigator.locks, `pup-quest:${DAILY_STREAK_KEY}`, () => {
     const commit = commitStreak(savedPreference(DAILY_STREAK_KEY), date);
@@ -490,7 +494,7 @@ function recordDailyStreak(date, run) {
   }).then((commit) => {
     syncDailyButton();
     if (commit.previous.best < STREAK_BADGE_DAYS && commit.state.best >= STREAK_BADGE_DAYS) toast(`${STREAK_BADGE_DAYS} days in a row! You earned the Week Walker badge 🏅`);
-    const { current, best } = commit.state;
+    const { current, best } = shown(commit);
     if (run.streak.current === current && run.streak.best === best) return;
     run.streak = { current, best };
     if (shownDailyRun !== run || game.status !== "won" || !game.level.daily) return;

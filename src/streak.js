@@ -29,6 +29,7 @@ const runLength = ([from, to]) => dayNumber(to) - dayNumber(from) + 1;
 const count = (value) => (Number.isSafeInteger(value) && value > 0 ? value : 0);
 
 // Sorts runs, joins overlapping or back-to-back ones, and drops runs that ended before the kept window.
+// The run ending the day before the window stays, so a late walk on the window's oldest day can still join it.
 function tidyRuns(runs) {
   const merged = [];
   for (const [from, to] of [...runs].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
@@ -37,7 +38,7 @@ function tidyRuns(runs) {
       if (to > previous[1]) previous[1] = to;
     } else merged.push([from, to]);
   }
-  const oldest = merged.length ? shiftDateKey(merged.at(-1)[1], 1 - STREAK_DAYS_KEPT) : "";
+  const oldest = merged.length ? shiftDateKey(merged.at(-1)[1], -STREAK_DAYS_KEPT) : "";
   return merged.filter(([, to]) => to >= oldest);
 }
 
