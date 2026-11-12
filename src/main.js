@@ -5,6 +5,7 @@ import { createRenderer } from "./render.js";
 import { THEMES, themeOverrideFromSearch } from "./themes.js";
 import { Sound } from "./audio.js";
 import { commitDailyBest, DAILY_BEST_KEY, dailyChallenge, parseDailyBest, utcDateKey } from "./daily.js";
+import { activeStreak, commitStreak, DAILY_STREAK_KEY, parseStreak, STREAK_BADGE_DAYS, streakCalendar } from "./streak.js";
 import {
   BEST_TIMES_KEY, commitBestTimes, formatTime, MEDAL_LABELS, medalFor, medalSvg, mergeBestTimes, nextMedal, parseBestTimes, recordBestTime, recordKeys,
   runMs, spokenTime, withSaveLock,
@@ -396,11 +397,34 @@ function todaysWalk() {
 function syncDailyButton() {
   const walk = todaysWalk();
   const best = parseDailyBest(savedPreference(DAILY_BEST_KEY), walk.date);
+  const streak = parseStreak(savedPreference(DAILY_STREAK_KEY));
+  const current = activeStreak(streak, walk.date);
+  const streakText = streak.best ? ` · 🐾 ${current}-DAY STREAK · BEST ${streak.best}${streak.best >= STREAK_BADGE_DAYS ? " 🏅" : ""}` : "";
   $("daily-button").textContent = `Daily walk: ${walk.title}`;
-  $("daily-button").setAttribute("aria-label", `Daily walk for today: ${walk.title}. ${walk.blurb}${best === null ? "" : ` Your best today is ${spokenTime(best)}.`}`);
-  $("daily-best").textContent = best === null ? `☀ ${walk.blurb}` : `☀ BEST TODAY ${formatTime(best)}`;
+  $("daily-button").setAttribute("aria-label", `Daily walk for today: ${walk.title}. ${walk.blurb}${best === null ? "" : ` Your best today is ${spokenTime(best)}.`}${streak.best ? ` ${streakSpeech(current, streak.best)}` : ""}`);
+  $("daily-best").textContent = `${best === null ? `☀ ${walk.blurb}` : `☀ BEST TODAY ${formatTime(best)}`}${streakText}`;
+  syncDailyCalendar(streak, walk.date);
   $("daily-button").hidden = !mapAvailable();
   $("daily-best").hidden = !mapAvailable();
+  $("daily-calendar").hidden = !mapAvailable() || !streak.best;
+}
+
+const dayCount = (days) => `${days} day${days === 1 ? "" : "s"}`;
+const streakSpeech = (current, best) => `Daily streak: ${dayCount(current)} in a row. Best streak: ${dayCount(best)}.${best >= STREAK_BADGE_DAYS ? " Week Walker badge earned." : ""}`;
+
+// A strip of the last two weeks with a paw on each day the walk was finished.
+function syncDailyCalendar(streak, today) {
+  const days = streakCalendar(streak, today);
+  const walked = days.filter((day) => day.done).length;
+  const calendar = $("daily-calendar");
+  calendar.setAttribute("aria-label", `Daily Walk calendar: walked ${walked} of the last ${days.length} days${days.at(-1).done ? ", including today" : ""}.`);
+  calendar.replaceChildren(...days.map(({ date, done, today: isToday }) => {
+    const cell = document.createElement("span");
+    cell.className = `daily-day${done ? " done" : ""}${isToday ? " today" : ""}`;
+    cell.title = `${date}${done ? ": walked" : ""}`;
+    cell.textContent = done ? "🐾" : String(Number(date.slice(8)));
+    return cell;
+  }));
 }
 
 function startDailyWalk() {
@@ -418,7 +442,10 @@ function startDailyWalk() {
 
 function dailyResultText(walk, run) {
   const best = run?.newBest ? "That's your best time today." : run?.best ? `Today's best is ${formatTime(run.best)}.` : "";
-  return `${walk.title}, conquered! ${best} A brand-new walk arrives at midnight UTC.`;
+  const streak = !run?.streak ? "" : run.streak.current
+    ? ` ${dayCount(run.streak.current)} in a row (best ${dayCount(run.streak.best)}).`
+    : ` Best streak: ${dayCount(run.streak.best)}.`;
+  return `${walk.title}, conquered! ${best}${streak} A brand-new walk arrives at midnight UTC.`;
 }
 
 const dailyBestStat = (run) => ["BEST TODAY", formatTime(run.best ?? run.ms)];
@@ -432,6 +459,7 @@ function recordDailyClear() {
   const result = commitDailyBest(ms, savedPreference(DAILY_BEST_KEY), date);
   const run = { ms, best: result.best, newBest: result.newBest };
   shownDailyRun = run;
+  recordDailyStreak(date, run);
   if (result.raw) {
     withSaveLock(navigator.locks, `pup-quest:${DAILY_BEST_KEY}`, () => {
       const commit = commitDailyBest(ms, savedPreference(DAILY_BEST_KEY), date);
@@ -451,6 +479,29 @@ function recordDailyClear() {
   return run;
 }
 
+// Counts the walk's day toward the streak (replays the same day don't). The results screen shows a
+// preview at once, then the streak saved under the cross-tab lock, which another tab may have changed.
+function recordDailyStreak(date, run) {
+  const preview = commitStreak(savedPreference(DAILY_STREAK_KEY), date);
+  // A walk finished a day or more after it began may already be too late to keep the streak alive.
+  const shown = ({ state }) => ({ current: activeStreak(state, utcDateKey()), best: state.best });
+  run.streak = shown(preview);
+  if (!preview.added) return;
+  withSaveLock(navigator.locks, `pup-quest:${DAILY_STREAK_KEY}`, () => {
+    const commit = commitStreak(savedPreference(DAILY_STREAK_KEY), date);
+    if (commit.raw) savedPreference(DAILY_STREAK_KEY, commit.raw);
+    return commit;
+  }).then((commit) => {
+    syncDailyButton();
+    if (commit.previous.best < STREAK_BADGE_DAYS && commit.state.best >= STREAK_BADGE_DAYS) toast(`${STREAK_BADGE_DAYS} days in a row! You earned the Week Walker badge 🏅`);
+    const { current, best } = shown(commit);
+    if (run.streak.current === current && run.streak.best === best) return;
+    run.streak = { current, best };
+    if (shownDailyRun !== run || game.status !== "won" || !game.level.daily) return;
+    $("overlay-description").textContent = dailyResultText(game.level.daily, run);
+  }).catch((error) => console.warn("Pup Quest could not save a Daily Walk streak:", error));
+}
+
 // Re-read and merge under a cross-tab lock so two tabs saving at once can't drop each other's records.
 function saveBestTimes() {
   withSaveLock(navigator.locks, `pup-quest:${BEST_TIMES_KEY}`, () => {
@@ -462,7 +513,7 @@ function saveBestTimes() {
 
 window.addEventListener("storage", (event) => {
   // A null key means another tab cleared all of storage.
-  if (event.key === `pup-quest:${DAILY_BEST_KEY}` || event.key === null) syncDailyButton();
+  if ([`pup-quest:${DAILY_BEST_KEY}`, `pup-quest:${DAILY_STREAK_KEY}`, null].includes(event.key)) syncDailyButton();
   if (event.key !== null && ![`pup-quest:${BEST_TIMES_KEY}`, `pup-quest:${SKIN_KEY}`].includes(event.key)) return;
   latestBestTimes();
   applySavedSkin();
