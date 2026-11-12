@@ -455,8 +455,9 @@ function recordDailyClear() {
   const ms = runMs(game.levelTime);
   const { date } = game.level.daily;
   const result = commitDailyBest(ms, savedPreference(DAILY_BEST_KEY), date);
-  const run = { ms, best: result.best, newBest: result.newBest, streak: recordDailyStreak(date) };
+  const run = { ms, best: result.best, newBest: result.newBest };
   shownDailyRun = run;
+  recordDailyStreak(date, run);
   if (result.raw) {
     withSaveLock(navigator.locks, `pup-quest:${DAILY_BEST_KEY}`, () => {
       const commit = commitDailyBest(ms, savedPreference(DAILY_BEST_KEY), date);
@@ -476,17 +477,25 @@ function recordDailyClear() {
   return run;
 }
 
-// Counts the walk's day toward the streak (replays the same day don't), saving under a cross-tab lock.
-function recordDailyStreak(date) {
+// Counts the walk's day toward the streak (replays the same day don't). The results screen shows a
+// preview at once, then the streak saved under the cross-tab lock, which another tab may have changed.
+function recordDailyStreak(date, run) {
   const preview = commitStreak(savedPreference(DAILY_STREAK_KEY), date);
-  if (preview.added) {
-    withSaveLock(navigator.locks, `pup-quest:${DAILY_STREAK_KEY}`, () => {
-      const commit = commitStreak(savedPreference(DAILY_STREAK_KEY), date);
-      if (commit.raw) savedPreference(DAILY_STREAK_KEY, commit.raw);
-    }).then(syncDailyButton).catch((error) => console.warn("Pup Quest could not save a Daily Walk streak:", error));
-    if (preview.state.current === STREAK_BADGE_DAYS) toast(`${STREAK_BADGE_DAYS} days in a row! You earned the Week Walker badge 🏅`);
-  }
-  return { current: preview.state.current, best: preview.state.best };
+  run.streak = { current: preview.state.current, best: preview.state.best };
+  if (!preview.added) return;
+  withSaveLock(navigator.locks, `pup-quest:${DAILY_STREAK_KEY}`, () => {
+    const commit = commitStreak(savedPreference(DAILY_STREAK_KEY), date);
+    if (commit.raw) savedPreference(DAILY_STREAK_KEY, commit.raw);
+    return commit;
+  }).then((commit) => {
+    syncDailyButton();
+    if (commit.previous.best < STREAK_BADGE_DAYS && commit.state.best >= STREAK_BADGE_DAYS) toast(`${STREAK_BADGE_DAYS} days in a row! You earned the Week Walker badge 🏅`);
+    const { current, best } = commit.state;
+    if (run.streak.current === current && run.streak.best === best) return;
+    run.streak = { current, best };
+    if (shownDailyRun !== run || game.status !== "won" || !game.level.daily) return;
+    $("overlay-description").textContent = dailyResultText(game.level.daily, run);
+  }).catch((error) => console.warn("Pup Quest could not save a Daily Walk streak:", error));
 }
 
 // Re-read and merge under a cross-tab lock so two tabs saving at once can't drop each other's records.

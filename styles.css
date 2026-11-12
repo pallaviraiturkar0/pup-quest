@@ -227,7 +227,7 @@ dialog .primary-button { margin-top: 10px; width: 100%; }
 .daily-best[hidden] { display: none; }
 .daily-calendar { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 2px; max-width: 250px; margin: 6px auto 0; }
 .daily-calendar[hidden] { display: none; }
-.daily-day { display: grid; place-items: center; aspect-ratio: 1; min-width: 0; background: #f3f1e4; border: 1px solid #d6d8c3; border-radius: 3px; font: 6px var(--mono); color: #8f9780; line-height: 1; }
+.daily-day { display: grid; place-items: center; aspect-ratio: 1; min-width: 0; background: #f3f1e4; border: 1px solid #d6d8c3; border-radius: 3px; font: 6px var(--mono); color: #59654e; line-height: 1; }
 .daily-day.done { background: #f6d27a; border-color: #c9a94f; font-size: 9px; }
 .daily-day.today { outline: 1px solid #6b7a52; outline-offset: 1px; }
 .trail-map-actions { display: flex; gap: 8px; }
