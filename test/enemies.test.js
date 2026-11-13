@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CAT, ENEMY_TYPES, enemyReach, makeEnemy, SEAGULL, updateEnemy, VACUUM, vacuumSpots } from "../src/enemies.js";
+import { CAT, ENEMY_TYPES, SWOOPERS, enemyReach, makeEnemy, SEAGULL, updateEnemy, VACUUM, vacuumSpots } from "../src/enemies.js";
 import { createGame, intersects, startGame, stepGame } from "../src/engine.js";
 import { GROUND_Y, LEVELS } from "../src/levels.js";
 import { createRenderer } from "../src/render.js";
@@ -58,7 +58,7 @@ function expectStompBounces(enemy) {
 }
 
 test("critters are built from data and reject unknown types or bad patrols", () => {
-  assert.deepEqual(ENEMY_TYPES, ["squirrel", "vacuum", "seagull", "cat"]);
+  assert.deepEqual(ENEMY_TYPES, ["squirrel", "vacuum", "seagull", "cat", "vulture"]);
   for (const type of ENEMY_TYPES) {
     const enemy = critter(type);
     assert.equal(enemy.type, type);
@@ -135,6 +135,21 @@ test("a seagull cruises above the pup's head, warns, then swoops to puppy height
   assert.ok(trace.every(({ x }) => x >= enemy.left && x <= enemy.right));
 });
 
+test("a canyon vulture reuses the seagull's glide, warning, and swoop", () => {
+  assert.deepEqual(SWOOPERS, ["seagull", "vulture"]);
+  const vulture = critter("vulture", { speed: 24 });
+  const gull = critter("seagull", { speed: 24 });
+  assert.equal(vulture.floor, GROUND_Y);
+  const bottoms = (enemy) => run(enemy, SEAGULL.period * 2)
+    .map(({ y, swooping, warning }) => ({ bottom: Math.round((y + enemy.h) * 1e6), swooping, warning }));
+  assert.deepEqual(bottoms(vulture), bottoms(gull), "same flight path, just bigger wings");
+  const swooping = critter("vulture");
+  run(swooping, SEAGULL.period - SEAGULL.swoopTime / 2);
+  assert.equal(swooping.swooping, true);
+  expectSideHitHurts(swooping, GROUND_Y - 18);
+  expectStompBounces(critter("vulture"));
+});
+
 test("seagull phases stagger flocks so they do not swoop together", () => {
   const early = critter("seagull");
   const late = critter("seagull", { phase: 1.3 });
@@ -209,6 +224,7 @@ test("every critter draws in each of its moods using only hex colors", () => {
     critter("vacuum"), { ...critter("vacuum"), mode: "windup" }, { ...critter("vacuum"), mode: "dash", direction: -1 },
     critter("seagull"), { ...critter("seagull"), warning: true }, { ...critter("seagull"), swooping: true, y: GROUND_Y - 30 },
     critter("cat"), { ...critter("cat"), mode: "crouch" }, { ...critter("cat"), mode: "pounce", direction: -1 },
+    critter("vulture"), { ...critter("vulture"), warning: true }, { ...critter("vulture"), swooping: true, y: GROUND_Y - 30 },
   ];
   for (const enemy of moods) {
     const fills = new Set();

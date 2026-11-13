@@ -11,9 +11,9 @@ export const PALETTE_KEYS = [
   "dirtDark", "stone", "water", "waterLight", "flower",
 ];
 
-export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps", "aurora", "glaciers", "snow", "harvest", "leaves"];
-export const SCATTER_KINDS = ["rock", "mushroom", "shell", "snowdrift", "pumpkin"];
-export const LANDMARK_KINDS = ["tree", "stump", "pillar", "palm", "bench", "hydrant", "snowman", "scarecrow"];
+export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps", "aurora", "glaciers", "snow", "harvest", "leaves", "mesas", "cacti", "tumbleweeds"];
+export const SCATTER_KINDS = ["rock", "mushroom", "shell", "snowdrift", "pumpkin", "pebbles"];
+export const LANDMARK_KINDS = ["tree", "stump", "pillar", "palm", "bench", "hydrant", "snowman", "scarecrow", "saguaro"];
 
 const DAY_SUN = { kind: "sun", parallax: 0.025, color: "#f5e8aa", halo: "#dce5c2" };
 const NIGHT_MOON = { kind: "moon", parallax: 0.025, color: "#ede9c8", halo: "#626687", shadow: "#68718d", crater: "#d2d4b6" };
@@ -179,6 +179,29 @@ export const THEMES = {
       { kind: "leaves", parallax: 0.5, count: 34, colors: ["#d0562f", "#e88a35", "#f0bb48", "#a8432c"] },
     ],
     decor: { scatter: "pumpkin", landmark: "scarecrow" },
+  },
+  canyon: {
+    label: "Sunset canyon",
+    palette: {
+      sky: "#f3a07a", horizon: "#fbd59a", cloud: "#fbd9bd", cloudShade: "#eeb196",
+      far: "#d98c74", hill: "#bf6448", treeBack: "#7e9a5c", tree: "#5d8048",
+      treeLight: "#8fb069", trunk: "#7a5236", grass: "#d9a66b", grassLight: "#ecc58c",
+      grassDark: "#a8693f", dirt: "#c0683f", dirtLight: "#d48352", dirtDark: "#934a2f",
+      stone: "#b88a6c", water: "#4f8a9a", waterLight: "#8fc4c8", flower: "#f0d36a",
+    },
+    layers: [
+      // A big sun sinking behind the canyon, with a few soft clouds and circling birds.
+      { kind: "sun", parallax: 0.02, color: "#fde29b", halo: "#f9bf86", top: 58 },
+      { ...CLOUDS, count: 4 },
+      { kind: "birds", parallax: 0.14, count: 3, color: "#7a4a4a" },
+      // Pale buttes far away, then striped red mesas closer in.
+      { kind: "mesas", parallax: 0.06, color: "far", band: "#e6a68c", spacing: 190, top: 112, base: 200, seed: 20 },
+      { kind: "mesas", parallax: 0.16, color: "hill", band: "#d0805c", spacing: 150, top: 134, base: 200, seed: 50 },
+      { kind: "cacti", parallax: 0.32, color: "tree", highlight: "treeLight", spacing: 96 },
+      // Tumbleweeds bounce along the canyon floor (and hold still with reduced motion).
+      { kind: "tumbleweeds", parallax: 0.45, count: 3, color: "#b08a4e", highlight: "#d6b57a" },
+    ],
+    decor: { scatter: "pebbles", landmark: "saguaro", flowers: false },
   },
 };
 

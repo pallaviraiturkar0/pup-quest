@@ -26,16 +26,29 @@ export function isUnlocked(index, unlocked) {
   return Number.isInteger(index) && index >= 0 && index < unlocked;
 }
 
-// Beating the boss finale records its time, so a saved finale time means the campaign is won.
-export function finaleCleared(bestTimes, levels) {
-  const finale = bestTimes?.[levels.length - 1];
-  return Number.isSafeInteger(finale) && finale > 0;
+// A saved best time for trail `index` means it has been cleared on this device.
+function clearedAt(bestTimes, index) {
+  const ms = bestTimes?.[index];
+  return Number.isSafeInteger(ms) && ms > 0;
 }
 
-// The bonus Trail 08 opens once the finale is cleared. Like the secret trail it is derived from saved
-// best times, so players who beat Moonlit Keep before it existed find it already open.
+// Beating the boss finale records its time, so a saved finale time means the campaign is won.
+export function finaleCleared(bestTimes, levels) {
+  return clearedAt(bestTimes, levels.length - 1);
+}
+
+// How many of the `count` bonus trails are open. They open one after another: Trail 08 once the finale is
+// cleared, then Trail 09 once Trail 08 is cleared (the bonus trails follow the campaign in the best times).
+// Like the secret trail this is derived from saved best times, so older saves find them already open.
+export function bonusTrailsOpen(bestTimes, levels, count = 1) {
+  let open = 0;
+  while (open < count && clearedAt(bestTimes, levels.length - 1 + open)) open += 1;
+  return open;
+}
+
+// Whether the first bonus trail, Trail 08, is open.
 export function bonusTrailOpen(bestTimes, levels) {
-  return finaleCleared(bestTimes, levels);
+  return bonusTrailsOpen(bestTimes, levels, 1) === 1;
 }
 
 // The secret trail opens once the finale is cleared or any campaign trail earns a gold paw.
@@ -45,20 +58,27 @@ export function secretTrailOpen(bestTimes, levels) {
   return levels.some((level, index) => medalFor(bestTimes?.[index], level.par) === "gold");
 }
 
-// `total` counts the campaign trails. With `bonus`, the bonus trail's stop (index `total`) joins the
-// map, open only once `bonusOpen`; with `secret`, the secret trail's stop follows as the last stop.
-export function createTrailMap(unlocked, total, preferred = unlocked - 1, { secret = false, bonus = false, bonusOpen = false } = {}) {
-  const bonusIndex = bonus ? total : null;
-  const secretIndex = secret ? total + (bonus ? 1 : 0) : null;
-  const map = { unlocked, total: total + (bonus ? 1 : 0) + (secret ? 1 : 0), trails: total, secret, secretIndex, bonus, bonusOpen: bonus && bonusOpen, bonusIndex, selected: 0 };
-  const extraOpen = preferred === secretIndex || (preferred === bonusIndex && map.bonusOpen);
+// `total` counts the campaign trails. `bonus` bonus stops (`true` means one) follow it from index `total`,
+// and the first `bonusOpen` of them are open (`true` means all); with `secret`, the secret trail's stop
+// follows as the last stop.
+export function createTrailMap(unlocked, total, preferred = unlocked - 1, { secret = false, bonus = 0, bonusOpen = 0 } = {}) {
+  const bonusCount = bonus === true ? 1 : Math.max(0, Math.floor(Number(bonus) || 0));
+  const openCount = bonusOpen === true ? bonusCount : Math.min(Math.max(0, Math.floor(Number(bonusOpen) || 0)), bonusCount);
+  const bonusIndex = bonusCount ? total : null;
+  const secretIndex = secret ? total + bonusCount : null;
+  const map = { unlocked, total: total + bonusCount + (secret ? 1 : 0), trails: total, secret, secretIndex, bonus: bonusCount, bonusOpen: openCount, bonusIndex, selected: 0 };
+  const extraOpen = preferred === secretIndex || (isBonusStop(map, preferred) && preferred - total < openCount);
   map.selected = extraOpen ? preferred : Math.min(Math.max(preferred, 0), Math.max(unlocked - 1, 0));
   return map;
 }
 
+export function isBonusStop(map, index) {
+  return map.bonus > 0 && Number.isInteger(index) && index >= map.trails && index < map.trails + map.bonus;
+}
+
 export function isStopOpen(map, index) {
   if (map.secret && index === map.secretIndex) return true;
-  if (map.bonus && index === map.bonusIndex) return map.bonusOpen;
+  if (isBonusStop(map, index)) return index - map.trails < map.bonusOpen;
   return isUnlocked(index, map.unlocked);
 }
 

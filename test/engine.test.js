@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { CRUMBLE } from "../src/crumble.js";
 import { createGame, HAY, ICE, iceUnder, intersects, nextLevel, pauseGame, PHYSICS, restartGame, resumeGame, startGame, stepGame } from "../src/engine.js";
-import { BONUS_INDEX, GROUND_Y, LEVELS, SECRET_INDEX, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "../src/levels.js";
+import { BONUS_INDEX, CANYON_INDEX, GROUND_Y, LEVELS, SECRET_INDEX, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "../src/levels.js";
 
 const tick = (game, input = {}) => stepGame(game, input, 1 / 120);
 function playing() {
@@ -243,7 +244,9 @@ test("every spawn, checkpoint, and exit has safe ground, and gaps are jumpable",
       assert.ok(level.enemies.every((enemy) => x + 14 < enemy.left || x > enemy.right + enemy.w));
     }
     const jumpDistance = PHYSICS.speed * PHYSICS.jump * 2 / PHYSICS.gravity;
-    assert.ok(level.gaps.every((gap) => gap.w < jumpDistance - 16));
+    // Canyon Caper's wide canyons are crossed on crumbling ledges instead (its reachability is checked in levels.test.js).
+    const bridged = (gap) => level.platforms.some((platform) => platform.crumble && platform.x >= gap.x && platform.x + platform.w <= gap.x + gap.w);
+    assert.ok(level.gaps.every((gap) => gap.w < jumpDistance - 16 || bridged(gap)), `${level.name}: a gap is too wide to jump`);
     assert.ok(level.width > VIEW_WIDTH);
   }
 });
@@ -374,6 +377,48 @@ test("clearing the bonus Trail 08 ends the run without wrapping into the campaig
   assert.equal(game.levelIndex, BONUS_INDEX);
   restartGame(game);
   assert.equal(game.levelIndex, BONUS_INDEX, "trying again replays Trail 08");
+});
+
+test("on Canyon Caper a crumbling ledge drops the pup a beat after landing, then re-forms", () => {
+  const game = createGame(CANYON_INDEX);
+  assert.equal(game.level.name, "Canyon Caper");
+  startGame(game);
+  const ledge = game.level.platforms.find((platform) => platform.crumble);
+  place(game, ledge.x + 8, ledge.y - game.player.h - 2);
+  game.events.length = 0;
+  for (let t = 0; t < 0.2 && !game.player.grounded; t += 1 / 120) tick(game);
+  assert.equal(game.player.grounded, true, "it holds at first");
+  assert.equal(ledge.crumble.state, "shaking");
+  assert.deepEqual(game.events.map((event) => event.type).filter((type) => type.startsWith("crumble")), ["crumble-shake"]);
+  for (let t = 0; t < CRUMBLE.delay + 0.05; t += 1 / 120) tick(game);
+  assert.equal(ledge.crumble.state, "fallen");
+  assert.ok(game.events.some((event) => event.type === "crumble" && event.y === ledge.y));
+  for (let t = 0; t < 0.2; t += 1 / 120) tick(game);
+  assert.ok(game.player.y > ledge.y, "the pup drops through");
+  assert.equal(TRAILS[CANYON_INDEX].platforms.find((platform) => platform.crumble).crumble.state, "solid", "the trail definition is untouched");
+  // Falling into the canyon costs a heart, and every ledge is back for the next try.
+  for (let t = 0; t < 2 && game.lives === 3; t += 1 / 120) tick(game);
+  assert.equal(game.lives, 2);
+  assert.ok(game.level.platforms.filter((platform) => platform.crumble).every((platform) => platform.crumble.state === "solid"));
+});
+
+test("an untouched crumbling ledge re-forms on its own, and clearing Trail 09 ends the run like Trail 08", () => {
+  const game = createGame(CANYON_INDEX);
+  startGame(game);
+  const ledge = game.level.platforms.find((platform) => platform.crumble);
+  place(game, ledge.x + 8, ledge.y - game.player.h - 2);
+  for (let t = 0; t < 0.2 && !game.player.grounded; t += 1 / 120) tick(game);
+  assert.equal(ledge.crumble.state, "shaking");
+  // Hop off sideways onto nothing; the ledge still falls and then comes back.
+  place(game, 48, GROUND_Y - game.player.h);
+  for (let t = 0; t < CRUMBLE.delay + CRUMBLE.gone + 0.1; t += 1 / 120) tick(game);
+  assert.equal(ledge.crumble.state, "solid");
+  finish(game);
+  assert.equal(game.status, "won");
+  nextLevel(game);
+  assert.equal(game.levelIndex, CANYON_INDEX);
+  restartGame(game);
+  assert.equal(game.levelIndex, CANYON_INDEX, "trying again replays Trail 09");
 });
 
 test("clearing the secret trail ends the run without wrapping into the campaign", () => {

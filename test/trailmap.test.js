@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  bonusTrailOpen, chooseTrail, contrastRatio, createTrailMap, isStopOpen, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, secretTrailOpen, stopColors,
+  bonusTrailOpen, bonusTrailsOpen, chooseTrail, contrastRatio, createTrailMap, isStopOpen, isUnlocked, mergeUnlocked, moveSelection, parseUnlocked, secretTrailOpen, stopColors,
   trailPath, unlockAfterClear,
 } from "../src/trailmap.js";
 import { createGame, nextLevel, restartGame, startGame } from "../src/engine.js";
-import { BONUS_INDEX, LEVELS, SECRET_INDEX } from "../src/levels.js";
+import { BONUS_INDEX, BONUS_TRAILS, CANYON_INDEX, CANYON_TRAIL, LEVELS, SECRET_INDEX, TRAILS } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
 
 const TOTAL = LEVELS.length;
@@ -128,22 +128,23 @@ test("the secret trail opens after beating the Mega-Vac or earning any gold paw"
 });
 
 test("once found, the secret trail is an extra open stop on the map, even with campaign trails still locked", () => {
-  const hidden = createTrailMap(2, TOTAL, 1, { bonus: true });
-  assert.equal(hidden.total, TOTAL + 1, "the map shows the campaign and Trail 08");
+  const hidden = createTrailMap(2, TOTAL, 1, { bonus: 2 });
+  assert.equal(hidden.total, TOTAL + 2, "the map shows the campaign and Trails 08 and 09");
   assert.equal(chooseTrail(hidden, SECRET_INDEX), null);
-  const map = createTrailMap(2, TOTAL, 1, { bonus: true, secret: true });
-  assert.equal(map.total, TOTAL + 2);
+  const map = createTrailMap(2, TOTAL, 1, { bonus: 2, secret: true });
+  assert.equal(map.total, TOTAL + 3);
   assert.equal(map.secretIndex, SECRET_INDEX);
   assert.equal(isStopOpen(map, SECRET_INDEX), true);
   assert.equal(isStopOpen(map, 2), false, "finding the secret never opens campaign trails");
   assert.equal(isStopOpen(map, BONUS_INDEX), false, "or Trail 08");
+  assert.equal(isStopOpen(map, CANYON_INDEX), false, "or Trail 09");
   assert.equal(chooseTrail(map, SECRET_INDEX), SECRET_INDEX);
   moveSelection(map, "End");
   assert.equal(map.selected, SECRET_INDEX);
-  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: true, secret: true }).selected, SECRET_INDEX, "replaying it reopens the map on its stop");
-  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: true }).selected, 1, "a hidden secret falls back to the furthest open trail");
+  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: 2, secret: true }).selected, SECRET_INDEX, "replaying it reopens the map on its stop");
+  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: 2 }).selected, 1, "a hidden secret falls back to the furthest open trail");
   assert.equal(createTrailMap(2, TOTAL, TOTAL, { secret: true }).selected, TOTAL, "without a bonus stop the secret follows the campaign");
-  assert.equal(trailPath(TOTAL + 2).stops.length, TOTAL + 2);
+  assert.equal(trailPath(TOTAL + 3).stops.length, TOTAL + 3);
 });
 
 test("Trail 08 opens after Moonlit Keep is beaten, including for saves made before it existed, and never re-locks the campaign", () => {
@@ -165,4 +166,37 @@ test("Trail 08 opens after Moonlit Keep is beaten, including for saves made befo
   assert.equal(chooseTrail(locked, BONUS_INDEX), null, "Trail 08 shows a padlock until the Mega-Vac is beaten");
   assert.equal(locked.selected, TOTAL - 1, "a locked Trail 08 falls back to the finale");
   assert.equal(unlockAfterClear(TOTAL, TOTAL - 1, TOTAL), TOTAL, "clearing the finale keeps the campaign unlock count in range");
+});
+
+test("Trail 09 opens after Harvest Hollow is cleared, just like Trail 08 opens after Moonlit Keep", () => {
+  const times = (entries = {}) => Array.from({ length: SECRET_INDEX + 1 }, (_, index) => entries[index] ?? null);
+  const count = BONUS_TRAILS.length;
+  assert.equal(count, 2);
+  assert.equal(TRAILS[CANYON_INDEX], CANYON_TRAIL);
+  assert.equal(bonusTrailsOpen(times(), LEVELS, count), 0, "a fresh save keeps both locked");
+  assert.equal(bonusTrailsOpen(null, LEVELS, count), 0);
+  // A save from before Trail 09 existed: the finale beaten but Harvest Hollow never played.
+  assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 61_000 }), LEVELS, count), 1, "only Trail 08 is open");
+  // A save that already cleared Harvest Hollow finds Trail 09 waiting.
+  assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 61_000, [BONUS_INDEX]: 50_000 }), LEVELS, count), 2);
+  assert.equal(bonusTrailsOpen(times({ [BONUS_INDEX]: 50_000 }), LEVELS, count), 0, "a Harvest time without the finale opens nothing");
+  assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 61_000, [BONUS_INDEX]: -1 }), LEVELS, count), 1, "tampered times are ignored");
+  assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 61_000, [CANYON_INDEX]: 40_000 }), LEVELS, count), 1, "its own time cannot open it");
+  assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 1, [BONUS_INDEX]: 1, [CANYON_INDEX]: 1 }), LEVELS, count), 2, "never more than the bonus trails");
+  assert.equal(bonusTrailOpen(times({ [TOTAL - 1]: 61_000 }), LEVELS), true, "the single-trail check still works");
+
+  const one = createTrailMap(TOTAL, TOTAL, CANYON_INDEX, { bonus: count, bonusOpen: 1, secret: true });
+  assert.equal(one.total, TOTAL + 3);
+  assert.equal(one.secretIndex, SECRET_INDEX);
+  assert.equal(isStopOpen(one, BONUS_INDEX), true);
+  assert.equal(isStopOpen(one, CANYON_INDEX), false, "Trail 09 shows a padlock until Harvest Hollow is cleared");
+  assert.equal(chooseTrail(one, CANYON_INDEX), null);
+  assert.equal(one.selected, TOTAL - 1, "a locked Trail 09 falls back to the furthest campaign trail");
+  const both = createTrailMap(TOTAL, TOTAL, CANYON_INDEX, { bonus: count, bonusOpen: 2, secret: true });
+  assert.equal(both.selected, CANYON_INDEX, "replaying Trail 09 reopens the map on its stop");
+  assert.equal(chooseTrail(both, CANYON_INDEX), CANYON_INDEX);
+  assert.equal(chooseTrail(both, SECRET_INDEX), SECRET_INDEX);
+  moveSelection(both, "End");
+  assert.equal(both.selected, SECRET_INDEX);
+  assert.equal(createTrailMap(TOTAL, TOTAL, 0, { bonus: count, bonusOpen: true }).bonusOpen, count, "`true` opens every bonus stop");
 });

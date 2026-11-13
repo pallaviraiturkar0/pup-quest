@@ -2,6 +2,7 @@ import { BOSS, bossDangerous, bossDefeated, resetBoss, stompBoss, updateBoss } f
 import { updateEnemy } from "./enemies.js";
 import { GROUND_Y, LEVELS, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "./levels.js";
 import { resetYeti, stompYeti, updateYeti, YETI, yetiDangerous, yetiHazardHits } from "./yeti.js";
+import { crumbleSolid, makeCrumble, stepCrumble } from "./crumble.js";
 import { applyPowerup, isScared, PICKUP_RADIUS, speedMultiplier, tickPlayerPowerups, tickScared } from "./powerups.js";
 
 export const PHYSICS = Object.freeze({
@@ -124,6 +125,8 @@ function loseLife(game, reason) {
   game.player = playerAt(spawn.x, spawn.y);
   game.player.invincible = 1.5;
   if (level.boss) bossRules(level.boss).reset(level.boss);
+  // Every crumbled ledge is back in place for the next try.
+  for (const platform of level.platforms) if (platform.crumble) Object.assign(platform.crumble, makeCrumble());
   game.cameraX = clamp(spawn.x - VIEW_WIDTH * 0.36, 0, level.width - VIEW_WIDTH);
   return true;
 }
@@ -203,7 +206,9 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   p.grounded = false;
   p.onIce = false;
   p.onHay = false;
+  const underfoot = new Set();
   for (const surface of [...level.ground, ...level.platforms]) {
+    if (!crumbleSolid(surface.crumble)) continue;
     if (p.vy >= 0 && previousBottom <= surface.y + 0.1 &&
         p.y + p.h >= surface.y && p.x + p.w > surface.x && p.x < surface.x + surface.w) {
       p.y = surface.y - p.h;
@@ -211,7 +216,13 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
       p.grounded = true;
       p.onIce ||= iceUnder(level, surface, p);
       p.onHay ||= Boolean(surface.hay);
+      underfoot.add(surface);
     }
+  }
+  for (const platform of level.platforms) {
+    if (!platform.crumble) continue;
+    const change = stepCrumble(platform.crumble, dt, { standing: underfoot.has(platform), blocked: intersects(p, platform) });
+    if (change) game.events.push({ type: change, x: platform.x + platform.w / 2, y: platform.y });
   }
   p.stride += Math.abs(p.vx) * dt;
   if (p.grounded && !wasGrounded && impactSpeed >= PHYSICS.landingSpeed) {

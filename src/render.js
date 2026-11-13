@@ -111,6 +111,19 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     ctx.restore();
   }
 
+  // A pixel saguaro with two arms; `h` is the trunk height.
+  function saguaro(x, floor, h, color, light) {
+    rect(x - 2, floor - h, 5, h, color);
+    rect(x - 1, floor - h - 1, 3, 1, color);
+    rect(x - 1, floor - h + 2, 1, h - 4, light);
+    const left = Math.round(floor - h * 0.55);
+    rect(x - 7, left, 5, 3, color);
+    rect(x - 7, left - 8, 3, 8, color);
+    const right = Math.round(floor - h * 0.72);
+    rect(x + 3, right, 5, 3, color);
+    rect(x + 5, right - 7, 3, 7, color);
+  }
+
   function lamp(x, floor, layer, theme, time) {
     const post = resolveColor(theme, layer.post);
     const light = resolveColor(theme, layer.light);
@@ -405,6 +418,57 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
         rect(x + (flip ? 1 : 0), y + (flip ? 2 : 0), 1, 1, theme.palette.trunk);
       }
     },
+    mesas(layer, game, time, theme) {
+      const { spacing, base } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      const body = resolveColor(theme, layer.color);
+      const band = resolveColor(theme, layer.band);
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        const index = i + Math.floor(scroll / spacing) + (layer.seed ?? 0);
+        const x = Math.round(i * spacing - (scroll % spacing) + noise(index + 230) * 30);
+        // Most are broad flat-topped mesas; a few are tall, narrow buttes.
+        const butte = noise(index + 233) < 0.35;
+        const top = Math.round(layer.top + noise(index + 231) * 26 - (butte ? 14 : 0));
+        const w = Math.round(spacing * (butte ? 0.18 : 0.45 + noise(index + 232) * 0.3));
+        polygon([[x - 16, 224], [x - 2, top + 8], [x, top], [x + w, top], [x + w + 2, top + 8], [x + w + 16, 224]], body);
+        rect(x + 2, top, w - 4, 2, band);
+        // Striped rock strata that widen with the slope.
+        for (let y = top + 9; y < base; y += 12) {
+          const spread = Math.floor(16 * (y - top - 8) / (224 - top - 8));
+          rect(x - spread, y, w + spread * 2, 2, band);
+        }
+      }
+    },
+    cacti(layer, game, time, theme) {
+      const { spacing } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      const color = resolveColor(theme, layer.color);
+      const light = resolveColor(theme, layer.highlight);
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        const index = i + Math.floor(scroll / spacing);
+        if (noise(index + 240) < 0.3) continue;
+        const x = Math.round(i * spacing - (scroll % spacing) + noise(index + 241) * 40);
+        saguaro(x, 200, 18 + Math.round(noise(index + 242) * 16), color, light);
+      }
+    },
+    tumbleweeds(layer, game, time, theme) {
+      const color = resolveColor(theme, layer.color);
+      const light = resolveColor(theme, layer.highlight);
+      const scroll = game.cameraX * layer.parallax;
+      for (let i = 0; i < layer.count; i += 1) {
+        const x = Math.round(wrap(noise(i + 600) * 560 - scroll + time * (26 + i * 9), 560) - 40);
+        const y = Math.round(192 - Math.abs(Math.sin(time * 3 + i * 2.1)) * 9);
+        // Two scribbly poses that alternate as it rolls.
+        const spin = Math.floor(time * 6 + i) % 2;
+        rect(x - 4, y - 3, 9, 7, color);
+        rect(x - 3, y - 4, 7, 9, color);
+        rect(x - 2, y - 2, 5, 5, theme.palette.sky);
+        rect(spin ? x - 2 : x - 1, y - 1, 1, 3, color);
+        rect(spin ? x + 1 : x, y - 2, 1, 3, color);
+        rect(x - 3, spin ? y - 4 : y + 3, 3, 1, light);
+        rect(x + 2, spin ? y + 2 : y - 3, 2, 1, light);
+      }
+    },
     lamps(layer, game, time, theme) {
       const { spacing } = layer;
       const scroll = game.cameraX * layer.parallax;
@@ -476,6 +540,42 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       rect(x + 7, surface.y + 4, 2, 1, HAY.light);
       rect(x + 13, surface.y + 8, 2, 1, HAY.shade);
       rect(x, surface.y - 1, 1, 15, HAY.shade);
+    }
+  }
+
+  // A crumbling sandstone ledge: it shakes and cracks once the pup lands, and while it is gone a
+  // faint dotted outline shows where it will re-form.
+  function sandstone(surface, palette, camera, time, reducedMotion) {
+    if (surface.x > camera + VIEW_WIDTH || surface.x + surface.w < camera) return;
+    const { state } = surface.crumble;
+    if (state === "fallen") {
+      ctx.globalAlpha = 0.45;
+      for (let x = surface.x; x < surface.x + surface.w; x += 4) {
+        rect(x, surface.y, 2, 1, palette.dirtLight);
+        rect(x + 2, surface.y + 11, 2, 1, palette.dirtLight);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+    const shaking = state === "shaking";
+    const x0 = surface.x + (shaking && !reducedMotion ? (Math.floor(time * 30) % 2 ? 1 : -1) : 0);
+    const { y, w } = surface;
+    rect(x0, y + 1, w, 11, palette.dirt);
+    rect(x0, y - 1, w, 3, palette.grassLight);
+    rect(x0, y + 2, w, 1, palette.grass);
+    for (let x = x0; x < x0 + w; x += 16) {
+      rect(x + 1, y + 5, 14, 1, palette.dirtLight);
+      rect(x + 2, y + 9, 12, 1, palette.dirtDark);
+      rect(x + 2, y + 12, 5, 2, palette.dirt);
+      rect(x + 9, y + 12, 4, 3, palette.dirt);
+      rect(x + 7, y + 3, 1, 3, palette.dirtDark);
+      // Deeper cracks (and falling grit, with motion) warn that it is about to give way.
+      if (shaking) {
+        rect(x + 4, y + 2, 1, 7, palette.dirtDark);
+        rect(x + 5, y + 8, 1, 4, palette.dirtDark);
+        rect(x + 11, y + 4, 1, 6, palette.dirtDark);
+        if (!reducedMotion) rect(x + 6 + (Math.floor(time * 12) % 5), y + 15 + Math.floor(time * 40) % 8, 1, 1, palette.dirtLight);
+      }
     }
   }
 
@@ -592,6 +692,11 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
         if (decor.scatter === "mushroom") mushroom(x + 12, GROUND_Y, palette);
         else if (decor.scatter === "shell") shell(x + 13, GROUND_Y);
         else if (decor.scatter === "pumpkin") pumpkin(x + 13, GROUND_Y);
+        else if (decor.scatter === "pebbles") {
+          rect(x + 9, GROUND_Y - 3, 5, 3, palette.stone);
+          rect(x + 15, GROUND_Y - 2, 3, 2, palette.dirtDark);
+          rect(x + 10, GROUND_Y - 3, 2, 1, palette.dirtLight);
+        }
         else if (decor.scatter === "snowdrift") {
           rect(x + 8, GROUND_Y - 3, 14, 3, palette.grassLight);
           rect(x + 11, GROUND_Y - 5, 7, 2, palette.grassLight);
@@ -612,6 +717,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       else if (decor.landmark === "hydrant") hydrant(x);
       else if (decor.landmark === "snowman") snowman(x, palette);
       else if (decor.landmark === "scarecrow") scarecrow(x, palette);
+      else if (decor.landmark === "saguaro") saguaro(x, GROUND_Y, 30, palette.tree, palette.treeLight);
       else if (decor.landmark === "stump") {
         rect(x - 8, GROUND_Y - 13, 18, 12, palette.trunk);
         rect(x - 10, GROUND_Y - 15, 22, 5, palette.dirtLight);
@@ -808,7 +914,11 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     ctx.restore();
   }
 
-  function seagull(enemy, time) {
+  const SEAGULL_LOOK = { body: "#f4f1e6", head: "#f4f1e6", eye: "#22282a", beak: "#f2b33d", tail: "#c9cfd2", wing: "#9aa4aa", wingLight: "#c9cfd2", feet: "#e08a3c", ruff: null };
+  // The canyon vulture: dusky feathers, a bald pink head and a fluffy pale ruff.
+  const VULTURE_LOOK = { body: "#5a3f36", head: "#e6a39a", eye: "#22282a", beak: "#e8d9b0", tail: "#3f2b25", wing: "#3b2924", wingLight: "#6e5045", feet: "#e8d9b0", ruff: "#efe3cf" };
+
+  function swooper(enemy, time, look) {
     if (enemy.swooping || enemy.warning) {
       const closeness = 1 - (enemy.floor - enemy.y - enemy.h) / 64;
       ctx.globalAlpha = 0.12 + 0.25 * Math.max(0, closeness);
@@ -817,22 +927,26 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     }
     facing(enemy);
     const flap = enemy.swooping ? 0 : Math.floor(time * 8) % 2;
-    rect(3, 4, 11, 4, "#f4f1e6");
-    rect(12, 2, 4, 4, "#f4f1e6");
-    rect(14, 3, 1, 1, "#22282a");
-    rect(16, 4, 2, 1, "#f2b33d");
-    rect(1, 5, 3, 2, "#c9cfd2");
+    rect(3, 4, 11, 4, look.body);
+    rect(12, 2, 4, 4, look.head);
+    if (look.ruff) rect(11, 5, 2, 2, look.ruff);
+    rect(14, 3, 1, 1, look.eye);
+    rect(16, 4, 2, 1, look.beak);
+    rect(1, 5, 3, 2, look.tail);
     if (enemy.swooping) {
-      rect(2, 2, 10, 2, "#9aa4aa");
-      rect(6, 8, 1, 2, "#e08a3c");
-      rect(9, 8, 1, 2, "#e08a3c");
+      rect(2, 2, 10, 2, look.wing);
+      rect(6, 8, 1, 2, look.feet);
+      rect(9, 8, 1, 2, look.feet);
     } else {
-      rect(4, flap ? 0 : 6, 8, 2, "#9aa4aa");
-      rect(5, flap ? 2 : 6, 5, 2, "#c9cfd2");
+      rect(4, flap ? 0 : 6, 8, 2, look.wing);
+      rect(5, flap ? 2 : 6, 5, 2, look.wingLight);
     }
     if (enemy.warning) rect(16, 0, 1, 2, "#ffedb2");
     ctx.restore();
   }
+
+  const seagull = (enemy, time) => swooper(enemy, time, SEAGULL_LOOK);
+  const vulture = (enemy, time) => swooper(enemy, time, VULTURE_LOOK);
 
   function cat(enemy, time) {
     facing(enemy);
@@ -859,7 +973,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     ctx.restore();
   }
 
-  const CRITTERS = { squirrel: critter, vacuum, seagull, cat };
+  const CRITTERS = { squirrel: critter, vacuum, seagull, cat, vulture };
 
   // Stone posts mark a boss arena's walls (holding up the Mega-Vac's safe ledges).
   function arenaWalls(boss, palette) {
@@ -1131,7 +1245,10 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     }
     decorations(game, theme);
     for (const ground of game.level.ground) terrain(ground, palette, false, game.cameraX);
-    for (const platform of game.level.platforms) (platform.hay ? hayBales : terrain)(platform, palette, true, game.cameraX);
+    for (const platform of game.level.platforms) {
+      if (platform.crumble) sandstone(platform, palette, game.cameraX, decorativeTime, reducedMotion);
+      else (platform.hay ? hayBales : terrain)(platform, palette, true, game.cameraX);
+    }
     for (const span of game.level.ice ?? []) iceSheet(span.x, GROUND_Y, span.w, false, game.cameraX);
     for (const { ice, y } of game.level.platforms) if (ice) iceSheet(ice.x, y, ice.w, true, game.cameraX);
     for (const spike of game.level.spikes) {
