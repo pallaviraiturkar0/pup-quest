@@ -15,7 +15,7 @@
 import { GROUND_Y, TILE } from "./levels.js";
 
 export const CODE_VERSION = 1;
-export const BUILDER_THEMES = Object.freeze(["meadow", "forest", "night", "park", "beach", "city", "castle", "arctic", "autumn"]);
+export const BUILDER_THEMES = Object.freeze(["meadow", "forest", "night", "park", "beach", "city", "castle", "arctic", "autumn", "canyon"]);
 export const MIN_COLUMNS = 30;
 export const MAX_COLUMNS = 80;
 export const DEFAULT_COLUMNS = 40;

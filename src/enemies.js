@@ -6,6 +6,7 @@ const SIZES = Object.freeze({
   vacuum: { w: 20, h: 9 },
   seagull: { w: 18, h: 10 },
   cat: { w: 18, h: 12 },
+  vulture: { w: 18, h: 10 },
 });
 
 export const ENEMY_TYPES = Object.freeze(Object.keys(SIZES));
@@ -13,8 +14,10 @@ export const ENEMY_TYPES = Object.freeze(Object.keys(SIZES));
 // A robot vacuum patrols, revs up when it spots the pup ahead, then dashes to the end of its beat.
 export const VACUUM = Object.freeze({ sight: 96, windup: 0.4, dashMultiplier: 3, cooldown: 1.2, floorTolerance: 2 });
 // A seagull glides high above the sand and swoops down to puppy height on a steady rhythm.
+// The canyon's vulture is a seagull in desert feathers: same glide, same swoop, same tells.
 export const SEAGULL = Object.freeze({ altitude: 64, swoopClearance: 14, period: 2.6, swoopTime: 1.1, warning: 0.4, bob: 2 });
 // An alley cat prowls a rooftop, crouches as a tell, then pounces in a short hop.
+export const SWOOPERS = Object.freeze(["seagull", "vulture"]);
 export const CAT = Object.freeze({ period: 2.2, crouch: 0.35, pounce: 170, gravity: 520, leapMultiplier: 2 });
 
 export function makeEnemy({ type = "squirrel", x, left, right, speed, floor, phase = 0 }) {
@@ -23,7 +26,7 @@ export function makeEnemy({ type = "squirrel", x, left, right, speed, floor, pha
   if (!(left <= x && x <= right)) throw new Error(`${type} at ${x} starts outside its patrol ${left}-${right}`);
   const enemy = { type, x, y: floor - size.h, ...size, left, right, speed, direction: 1, alive: true, floor };
   if (type === "vacuum") Object.assign(enemy, { mode: "patrol", timer: 0 });
-  if (type === "seagull") Object.assign(enemy, { timer: phase, swooping: false, warning: false, y: seagullCruiseY(enemy) });
+  if (SWOOPERS.includes(type)) Object.assign(enemy, { timer: phase, swooping: false, warning: false, y: seagullCruiseY(enemy) });
   if (type === "cat") Object.assign(enemy, { mode: "prowl", timer: phase, vy: 0 });
   return enemy;
 }
@@ -34,7 +37,7 @@ function seagullCruiseY(enemy) {
 
 // Highest point the critter's top edge can ever reach, for level-design checks.
 export function enemyTop(enemy) {
-  if (enemy.type === "seagull") return seagullCruiseY(enemy) - SEAGULL.bob;
+  if (SWOOPERS.includes(enemy.type)) return seagullCruiseY(enemy) - SEAGULL.bob;
   if (enemy.type === "cat") return enemy.floor - enemy.h - CAT.pounce ** 2 / (2 * CAT.gravity);
   return enemy.floor - enemy.h;
 }
@@ -115,7 +118,7 @@ function updateCat(enemy, dt) {
 
 export function updateEnemy(enemy, dt, player) {
   if (enemy.type === "vacuum") updateVacuum(enemy, dt, player);
-  else if (enemy.type === "seagull") updateSeagull(enemy, dt);
+  else if (SWOOPERS.includes(enemy.type)) updateSeagull(enemy, dt);
   else if (enemy.type === "cat") updateCat(enemy, dt);
   else patrol(enemy, enemy.speed, dt);
 }

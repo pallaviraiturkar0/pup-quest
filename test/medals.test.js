@@ -5,7 +5,7 @@ import {
   recordBestTime, recordKeys, runMs, serializeBestTimes, spokenTime, withSaveLock,
 } from "../src/medals.js";
 import { createGame, pauseGame, resumeGame, startGame, stepGame } from "../src/engine.js";
-import { BONUS_INDEX, LEVELS, TRAILS } from "../src/levels.js";
+import { BONUS_INDEX, CANYON_INDEX, LEVELS, SECRET_INDEX, TRAILS } from "../src/levels.js";
 import { contrastRatio } from "../src/trailmap.js";
 
 const TOTAL = LEVELS.length;
@@ -75,6 +75,22 @@ test("Trail 08's best time has its own key, so old saves load unchanged and neve
   const times = [...loaded];
   times[BONUS_INDEX] = 31_000;
   assert.equal(commitBestTimes(times, old, keys).raw, '{"1":20000,"7":61000,"8-harvest":31000}');
+});
+
+test("Trail 09 saves its best time under 9-canyon, and the secret trail keeps its key after moving along", () => {
+  const keys = recordKeys(TRAILS);
+  assert.equal(keys[CANYON_INDEX], "9-canyon");
+  assert.equal(keys[SECRET_INDEX], "8-yeti");
+  assert.equal(new Set(keys).size, keys.length);
+  // A save from before Trail 09: its Harvest and Yeti records stay put, and "9" is never read as a Canyon time.
+  const old = '{"7":61000,"8-harvest":31000,"8-yeti":30000,"9":12000}';
+  const loaded = parseBestTimes(old, keys);
+  assert.equal(loaded[BONUS_INDEX], 31_000);
+  assert.equal(loaded[SECRET_INDEX], 30_000);
+  assert.equal(loaded[CANYON_INDEX], null);
+  const times = [...loaded];
+  times[CANYON_INDEX] = 40_000;
+  assert.match(commitBestTimes(times, old, keys).raw, /"9-canyon":40000/);
 });
 
 test("saved best times survive missing, corrupt, and tampered data", () => {

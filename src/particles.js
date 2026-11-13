@@ -12,6 +12,7 @@ const HURT = ["#d99778", "#f0b58f"];
 const SNOW = ["#ffffff", "#e6eff4", "#b9e1f2"];
 const HEARTS = ["#ef6f6c", "#f29bb2"];
 const STRAW = ["#e2bf62", "#f3dc8d", "#c09a45"];
+const SAND = ["#c0683f", "#d48352", "#ecc58c"];
 
 // Each burst describes how many particles to spawn and how they move.
 // `still` bursts are the reduced-motion fallback: a few motionless sparkles.
@@ -25,6 +26,7 @@ export const BURSTS = Object.freeze({
   snow: { count: 10, shape: "square", colors: SNOW, spreadX: 70, liftMin: 10, liftMax: 50, life: [0.35, 0.6], size: [1, 3], gravity: GRAVITY, reduced: 0 },
   hearts: { count: 12, shape: "heart", colors: HEARTS, spreadX: 90, liftMin: 30, liftMax: 80, life: [1, 1.6], size: [1, 1], gravity: 30, reduced: 3 },
   straw: { count: 8, shape: "square", colors: STRAW, spreadX: 60, liftMin: 10, liftMax: 40, life: [0.3, 0.5], size: [1, 2], gravity: GRAVITY, reduced: 0 },
+  sand: { count: 12, shape: "square", colors: SAND, spreadX: 50, liftMin: 2, liftMax: 24, life: [0.4, 0.7], size: [1, 3], gravity: GRAVITY, reduced: 0 },
   paws: { count: 14, shape: "paw", colors: PAWS, spreadX: 150, liftMin: 50, liftMax: 120, life: [1, 1.6], size: [1, 1], gravity: 90, reduced: 0 },
 });
 
@@ -33,6 +35,7 @@ export const EVENT_BURSTS = Object.freeze({
   land: ["dust"],
   jump: ["dust"],
   "hay-jump": ["straw"],
+  crumble: ["sand"],
   treat: ["sparkle"],
   powerup: ["big-sparkle"],
   key: ["big-sparkle"],

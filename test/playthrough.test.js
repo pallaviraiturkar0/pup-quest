@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame, ICE, nextLevel, PHYSICS, startGame, stepGame } from "../src/engine.js";
-import { BONUS_INDEX, LEVELS, SECRET_INDEX } from "../src/levels.js";
+import { BONUS_INDEX, CANYON_INDEX, LEVELS, SECRET_INDEX } from "../src/levels.js";
 import { createRandom, dailyChallenge, MODIFIER_IDS, MODIFIERS, remixTrail } from "../src/daily.js";
 import { BOSS } from "../src/boss.js";
 import { YETI } from "../src/yeti.js";
@@ -97,6 +97,18 @@ const HARVEST_ROUTE = [
   [1650, 208], [1730, 208, true], [1760, 176, true], [1840, 144, true], [1900, 176, true], [2030, 176, true],
   [2140, 176, true], [2220, 144, true], [2315, 208, true], [2400, 208, true], [2450, 176, true], [2540, 160, true],
   [2670, 208, true],
+];
+
+// Canyon Caper, the bonus Trail 09: each canyon is crossed by landing on a crumbling ledge and hopping
+// straight on before it drops, and the hop between the middle canyon's first two ledges grabs the key.
+const CANYON_ROUTE = [
+  [120, 208], [140, 176, true], [220, 144, true], [270, 208], [350, 208, true], [395, 176, true], [470, 144, true],
+  [535, 176, true], [590, 208], [650, 176, true], [745, 208, true], [790, 176, true], [855, 144, true], [915, 112, true],
+  [945, 112], [1050, 208, true], [1100, 176, true], [1175, 144, true], [1240, 208], [1300, 176, true], [1350, 144, true],
+  [1400, 176, true], [1478, 176, true], [1540, 144, true], [1625, 208, true], [1720, 208, true], [1765, 176, true],
+  [1845, 144, true], [1910, 176, true], [1935, 176], [2025, 176, true], [2070, 144, true], [2165, 176, true],
+  [2230, 144, true], [2300, 208], [2395, 208, true], [2440, 176, true], [2480, 176], [2535, 160, true], [2600, 208, true],
+  [2730, 208],
 ];
 
 // The Grumpy Yeti's arena: the pup waits on the left ice patch so the Yeti leaps
@@ -263,6 +275,26 @@ test("a real-input run of Harvest Hollow bounces off hay bales to the hayloft ke
   };
   for (const [x, floor, jump] of HARVEST_ROUTE) travel(game, x, floor, jump);
   assert.ok(hayJumps >= 3, `the route bounces off the bales (${hayJumps})`);
+  assert.equal(game.keyFound, true);
+  assert.equal(game.status, "won");
+  assert.equal(medalFor(runMs(game.levelTime), game.level.par), "gold", `${game.levelTime.toFixed(2)}s misses gold`);
+  assert.equal(game.deaths, 0);
+});
+
+test("a real-input run of Canyon Caper hops across every crumbling ledge before it drops and wins inside gold par without losing a heart", () => {
+  const game = createGame(CANYON_INDEX);
+  startGame(game);
+  stepGame(game);
+  const seen = [];
+  const step = game.events.push.bind(game.events);
+  game.events.push = (...events) => {
+    seen.push(...events.map((event) => event.type));
+    return step(...events);
+  };
+  for (const [x, floor, jump] of CANYON_ROUTE) travel(game, x, floor, jump);
+  const ledges = game.level.platforms.filter((platform) => platform.crumble).length;
+  assert.equal(seen.filter((type) => type === "crumble-shake").length, ledges, "the route lands on every crumbling ledge");
+  assert.ok(seen.filter((type) => type === "crumble").length >= ledges, "and each one drops away behind the pup");
   assert.equal(game.keyFound, true);
   assert.equal(game.status, "won");
   assert.equal(medalFor(runMs(game.levelTime), game.level.par), "gold", `${game.levelTime.toFixed(2)}s misses gold`);

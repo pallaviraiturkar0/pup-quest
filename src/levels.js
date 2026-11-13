@@ -2,6 +2,7 @@ import { makeBoss } from "./boss.js";
 import { makeEnemy } from "./enemies.js";
 import { makeYeti } from "./yeti.js";
 import { makePowerup } from "./powerups.js";
+import { makeCrumble } from "./crumble.js";
 
 export const TILE = 16;
 export const VIEW_WIDTH = 480;
@@ -31,10 +32,12 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     gaps: gaps.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
     // A fourth "ice" entry glazes a platform, leaving one grippy tile at each end so the pup never slides off an edge.
     // A fourth "hay" entry makes it a row of springy hay bales (see HAY in engine.js).
+    // A fourth "crumble" entry makes it a sandstone ledge that drops away soon after the pup lands (see crumble.js).
     platforms: platforms.map(([x, y, w, surface]) => ({
       x: x * TILE, y: y * TILE, w: w * TILE, h: TILE,
       ice: surface === "ice" ? { x: (x + 1) * TILE, w: (w - 2) * TILE } : null,
       ...(surface === "hay" ? { hay: true } : {}),
+      ...(surface === "crumble" ? { crumble: makeCrumble() } : {}),
     })),
     // [column, width] stretches of slippery ice on the ground.
     ice: ice.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
@@ -234,7 +237,49 @@ export const BONUS_TRAIL = trail({
   ],
 });
 
-// Every playable trail: the campaign, the bonus trail at `BONUS_INDEX`, then the secret trail at `SECRET_INDEX`.
+// Trail 09, the second bonus trail. It opens once Harvest Hollow has been cleared (see `bonusTrailsOpen`
+// in trailmap.js). Three wide canyons can only be crossed on crumbling sandstone ledges that drop away a
+// moment after the pup lands, and the golden key hangs above the middle of the widest one.
+export const CANYON_TRAIL = trail({
+  name: "Canyon Caper", theme: "canyon", columns: 176, par: [34, 46, 70], bonus: true,
+  record: "9-canyon",
+  gaps: [[18, 3], [38, 8], [62, 3], [80, 9], [104, 3], [124, 8], [146, 3]],
+  platforms: [
+    [8, 11, 3], [13, 9, 3], [24, 11, 4], [29, 9, 3], [33, 11, 3],
+    // The first canyon: one crumbling ledge in the middle.
+    [40, 11, 3, "crumble"],
+    [49, 11, 3], [53, 9, 3], [57, 7, 3], [68, 11, 4], [73, 9, 3],
+    // The widest canyon: a crumbling staircase with the golden key above its high step.
+    [81, 11, 2, "crumble"], [84, 9, 2, "crumble"], [87, 11, 2, "crumble"],
+    [92, 11, 3], [96, 9, 3], [110, 11, 4], [115, 9, 3], [119, 11, 3],
+    // The last canyon, with a treat on a higher crumbling step.
+    [126, 11, 2, "crumble"], [129, 9, 2, "crumble"],
+    [135, 11, 3], [139, 9, 3], [152, 11, 4], [158, 10, 3],
+  ],
+  treats: [
+    [5, 188], [9, 164], [10, 164], [14, 132], [15, 132], [25, 164], [26, 164], [30, 132], [34, 164], [36, 188],
+    [41, 164], [42, 164], [50, 164], [54, 132], [57, 100], [59, 100], [66, 188], [69, 164], [70, 164], [74, 132],
+    [78, 188], [82, 164], [84, 128], [88, 164], [91, 188], [93, 164], [94, 164], [97, 132], [98, 132], [108, 188],
+    [111, 164], [112, 164], [116, 132], [117, 132], [120, 164], [127, 164], [130, 132], [134, 188], [136, 164],
+    [140, 132], [141, 132], [150, 188], [153, 164], [154, 164], [159, 148], [160, 148], [164, 188],
+  ],
+  powerups: [["squeaky", 37, 188], ["bone", 58, 96], ["zoomies", 113, 156]],
+  key: [85, 110], checkpoint: 77,
+  spikes: [[31, 1], [59, 1], [72, 1], [100, 1], [121, 1], [142, 1]],
+  enemies: [
+    [26, 25, 29, 24], [54, 53, 57, 26], [93, 91, 97, 26], [136, 134, 140, 28],
+    { type: "vulture", x: 66, left: 65, right: 72, speed: 24 },
+    { type: "vulture", x: 111, left: 110, right: 118, speed: 26, phase: 1.3 },
+  ],
+});
+
+// The bonus trails in the order they open: Trail 08 after the campaign, then Trail 09 after Trail 08.
+export const BONUS_TRAILS = [BONUS_TRAIL, CANYON_TRAIL];
+
+// Every playable trail: the campaign, the bonus trails from `BONUS_INDEX` (Trail 08) and `CANYON_INDEX`
+// (Trail 09), then the secret trail at `SECRET_INDEX`. Saved records use each trail's `record` key, so
+// these positions can move without touching old saves.
 export const BONUS_INDEX = LEVELS.length;
-export const SECRET_INDEX = LEVELS.length + 1;
-export const TRAILS = [...LEVELS, BONUS_TRAIL, SECRET_TRAIL];
+export const CANYON_INDEX = LEVELS.length + 1;
+export const SECRET_INDEX = LEVELS.length + BONUS_TRAILS.length;
+export const TRAILS = [...LEVELS, ...BONUS_TRAILS, SECRET_TRAIL];

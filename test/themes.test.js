@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame } from "../src/engine.js";
-import { BONUS_INDEX, BONUS_TRAIL, LEVELS, SECRET_INDEX, SECRET_TRAIL, VIEW_WIDTH } from "../src/levels.js";
+import { BONUS_INDEX, BONUS_TRAIL, CANYON_INDEX, CANYON_TRAIL, LEVELS, SECRET_INDEX, SECRET_TRAIL, VIEW_WIDTH } from "../src/levels.js";
 import { createRenderer } from "../src/render.js";
 import {
   DEFAULT_THEME, getTheme, LANDMARK_KINDS, LAYER_KINDS, PALETTE_KEYS, resolveColor,
@@ -83,6 +83,49 @@ test("autumn leaves drift over time but hold still with reduced motion", () => {
   assert.notEqual(leavesAt(1, false), "", "leaves are drawn");
   assert.notEqual(leavesAt(1, false), leavesAt(3, false));
   assert.equal(leavesAt(1, true), leavesAt(3, true));
+});
+
+test("the canyon theme brings a sunset, layered mesas and buttes, cacti, and tumbleweeds", () => {
+  assert.equal(themeForLevel(CANYON_TRAIL), THEMES.canyon);
+  assert.equal(getTheme("canyon"), THEMES.canyon);
+  const kinds = THEMES.canyon.layers.map((layer) => layer.kind);
+  for (const kind of ["sun", "mesas", "cacti", "tumbleweeds"]) assert.ok(kinds.includes(kind), kind);
+  const mesas = THEMES.canyon.layers.filter((layer) => layer.kind === "mesas");
+  assert.equal(mesas.length, 2, "distant buttes and nearer mesas");
+  assert.ok(mesas[0].parallax < mesas[1].parallax, "the far layer scrolls slower");
+  assert.deepEqual(THEMES.canyon.decor, { scatter: "pebbles", landmark: "saguaro", flowers: false });
+});
+
+test("tumbleweeds roll over time but hold still with reduced motion, and crumbling ledges shake only with motion", () => {
+  const weed = THEMES.canyon.layers.find((layer) => layer.kind === "tumbleweeds").color;
+  const sandstone = THEMES.canyon.palette.dirt;
+  const drawn = (game, time, reducedMotion, color) => {
+    const spots = [];
+    let fill = "";
+    const noop = () => {};
+    const ctx = {
+      globalAlpha: 1, font: "", imageSmoothingEnabled: false,
+      set fillStyle(value) { fill = value; }, get fillStyle() { return fill; },
+      fillRect(x, y) { if (fill === color) spots.push(`${x},${y}`); },
+      beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop,
+      save: noop, restore: noop, translate: noop, scale: noop, fillText: noop,
+    };
+    createRenderer({ getContext: () => ctx }).render(game, time, 0, reducedMotion);
+    return spots.join(" ");
+  };
+  const game = createGame(CANYON_INDEX);
+  assert.notEqual(drawn(game, 1, false, weed), "", "tumbleweeds are drawn");
+  assert.notEqual(drawn(game, 1, false, weed), drawn(game, 3, false, weed));
+  assert.equal(drawn(game, 1, true, weed), drawn(game, 3, true, weed));
+  // Put the first crumbling ledge on screen and set it shaking.
+  const ledge = game.level.platforms.find((platform) => platform.crumble);
+  game.cameraX = ledge.x - 100;
+  ledge.crumble.state = "shaking";
+  assert.notEqual(drawn(game, 1, false, sandstone), drawn(game, 1.05, false, sandstone), "a shaking ledge wobbles");
+  assert.equal(drawn(game, 1, true, sandstone), drawn(game, 1.05, true, sandstone), "but not with reduced motion");
+  const solid = drawn(game, 1, true, sandstone);
+  ledge.crumble.state = "fallen";
+  assert.notEqual(drawn(game, 1, true, sandstone), solid, "a fallen ledge is not drawn");
 });
 
 test("ice is drawn on the secret trail's slippery ground and ledges", () => {

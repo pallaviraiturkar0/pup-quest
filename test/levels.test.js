@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { enemyReach } from "../src/enemies.js";
+import { enemyReach, SWOOPERS } from "../src/enemies.js";
 import { HAY, ICE, intersects, PHYSICS } from "../src/engine.js";
-import { BONUS_INDEX, BONUS_TRAIL, GROUND_Y, LEVELS, SECRET_INDEX, SECRET_TRAIL, TILE, TRAILS, VIEW_HEIGHT } from "../src/levels.js";
+import { BONUS_INDEX, BONUS_TRAIL, CANYON_INDEX, CANYON_TRAIL, GROUND_Y, LEVELS, SECRET_INDEX, SECRET_TRAIL, TILE, TRAILS, VIEW_HEIGHT } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
 
 const PUPPY = { w: 14, h: 18 };
@@ -18,7 +18,7 @@ const takeoff = (surface, useHay = true) => (useHay && surface.hay ? HAY.jump : 
 function surfacesOf(level) {
   return [
     ...level.ground.map((block, index) => ({ id: `ground ${index}`, x0: block.x, x1: block.x + block.w, y: block.y, hay: false })),
-    ...level.platforms.map((block, index) => ({ id: `platform ${index}`, x0: block.x, x1: block.x + block.w, y: block.y, hay: Boolean(block.hay) })),
+    ...level.platforms.map((block, index) => ({ id: `platform ${index}`, x0: block.x, x1: block.x + block.w, y: block.y, hay: Boolean(block.hay), crumble: Boolean(block.crumble) })),
   ];
 }
 
@@ -135,7 +135,7 @@ test("hazards sit on solid ground and critters never wander out over water", () 
     for (const spike of level.spikes) {
       assert.ok(level.ground.some((ground) => spike.x >= ground.x && spike.x + spike.w <= ground.x + ground.w), `${level.name}: spike at ${spike.x} floats over a gap`);
     }
-    for (const enemy of level.enemies.filter((critter) => critter.type !== "seagull")) {
+    for (const enemy of level.enemies.filter((critter) => !SWOOPERS.includes(critter.type))) {
       // Walkers keep their whole hitbox on the ground or rooftop they patrol.
       const [from, to] = enemy.floor === GROUND_Y
         ? [enemy.left + enemy.w / 2, enemy.right + enemy.w / 2]
@@ -187,7 +187,7 @@ test("Frosty Fjord is a secret arctic trail kept outside the campaign", () => {
   assert.equal(SECRET_TRAIL.name, "Frosty Fjord");
   assert.equal(SECRET_TRAIL.theme, "arctic");
   assert.equal(SECRET_TRAIL.secret, true);
-  assert.equal(SECRET_INDEX, LEVELS.length + 1, "it comes after the bonus Trail 08");
+  assert.equal(SECRET_INDEX, LEVELS.length + 2, "it comes after the bonus Trails 08 and 09");
   assert.equal(TRAILS[SECRET_INDEX], SECRET_TRAIL);
   assert.ok(LEVELS.every((level) => !level.secret && level.ice.length === 0 && level.platforms.every((platform) => !platform.ice)),
     "campaign trails keep their grip");
@@ -229,6 +229,47 @@ test("Harvest Hollow's hay bales matter: the golden key and the lofts need a hay
   }
   const hayOnly = BONUS_TRAIL.treats.filter((treat) => ![...ordinary.reachable].some((surface) => canTouch(surface, treat, false)));
   assert.ok(hayOnly.length >= 6, `some treats reward a bale bounce (${hayOnly.length})`);
+});
+
+test("Canyon Caper is Trail 09: a sunset canyon bonus trail after Harvest Hollow, with vultures and crumbling ledges", () => {
+  assert.equal(CANYON_TRAIL.name, "Canyon Caper");
+  assert.equal(CANYON_TRAIL.theme, "canyon");
+  assert.equal(CANYON_INDEX, BONUS_INDEX + 1);
+  assert.equal(TRAILS[CANYON_INDEX], CANYON_TRAIL);
+  assert.equal(CANYON_TRAIL.bonus, true);
+  assert.equal(CANYON_TRAIL.secret, false);
+  assert.equal(CANYON_TRAIL.boss, null);
+  assert.equal(CANYON_TRAIL.record, "9-canyon");
+  assert.ok(!LEVELS.includes(CANYON_TRAIL), "the campaign is still seven trails");
+  assert.ok(CANYON_TRAIL.width >= BONUS_TRAIL.width, "at least as long as Trail 08");
+  assert.deepEqual(new Set(CANYON_TRAIL.enemies.map((enemy) => enemy.type)), new Set(["squirrel", "vulture"]));
+  assert.deepEqual(CANYON_TRAIL.powerups.map((item) => item.type).sort(), ["bone", "squeaky", "zoomies"]);
+  assert.ok(TRAILS.every((level) => level === CANYON_TRAIL || level.platforms.every((platform) => !platform.crumble)), "only Canyon Caper crumbles");
+  assert.ok(CANYON_TRAIL.platforms.every((platform) => !platform.crumble || platform.crumble.state === "solid"), "ledges start solid");
+});
+
+test("Canyon Caper's crumbling ledges matter: the wide canyons and the golden key need them, and every treat can be reached", () => {
+  const ledges = CANYON_TRAIL.platforms.filter((platform) => platform.crumble);
+  assert.ok(ledges.length >= 4, "a few crumbling ledges");
+  assert.ok(ledges.every((ledge) => ledge.w >= 2 * TILE), "ledges are wide enough to land on");
+  const all = reachableSurfaces(CANYON_TRAIL);
+  for (const treat of CANYON_TRAIL.treats) {
+    assert.ok([...all.reachable].some((surface) => canTouch(surface, treat)), `treat at x=${treat.x}, y=${treat.y} cannot be reached`);
+  }
+  // Without the crumbling ledges the pup cannot get across, and the key is out of reach.
+  const solidOnly = { ...CANYON_TRAIL, platforms: CANYON_TRAIL.platforms.filter((platform) => !platform.crumble) };
+  const { surfaces, reachable } = reachableSurfaces(solidOnly);
+  const exitFloor = surfaceUnder(surfaces.filter((surface) => surface.id.startsWith("ground")), solidOnly.exit.x + 8);
+  assert.ok(!reachable.has(exitFloor), "the doghouse needs the crumbling ledges");
+  assert.ok(![...reachable].some((surface) => canTouch(surface, solidOnly.key)), "the key needs a crumbling ledge");
+  const keyLedges = [...all.reachable].filter((surface) => canTouch(surface, CANYON_TRAIL.key));
+  assert.ok(keyLedges.length > 0 && keyLedges.every((surface) => surface.crumble), "only a crumbling ledge reaches the key");
+  // Every gap too wide for a plain jump is bridged by a crumbling ledge.
+  const wide = CANYON_TRAIL.gaps.filter((gap) => !canHop({ x0: gap.x - TILE, x1: gap.x, y: GROUND_Y }, { x0: gap.x + gap.w, x1: gap.x + gap.w + TILE, y: GROUND_Y }));
+  assert.equal(wide.length, 3, "three wide canyons");
+  for (const gap of wide) {
+    assert.ok(ledges.some((ledge) => ledge.x >= gap.x && ledge.x + ledge.w <= gap.x + gap.w), `canyon at ${gap.x} has a crumbling ledge`);
+  }
 });
 
 test("ice is fair: patches sit on solid ground, clear of ledges, spikes, critters, and checkpoints", () => {
