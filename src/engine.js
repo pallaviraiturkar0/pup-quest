@@ -25,6 +25,12 @@ export const ICE = Object.freeze({ traction: 0.3 });
 // Releasing jump early still cuts it short, so a little hop off a bale stays easy.
 export const HAY = Object.freeze({ jump: 340 });
 
+// In a flooded lagoon the pup swims: gravity is gentle and it sinks slowly, so every jump press is a
+// paddle stroke upward. Near the surface (head within `breach` pixels of it) a press is a full jump
+// that leaps out of the water, full height even if jump is only tapped. Sinking past the bottom of the
+// screen still costs a life.
+export const SWIM = Object.freeze({ gravity: 240, maxFall: 70, stroke: 125, speed: 0.75, breach: 4 });
+
 export function intersects(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -33,7 +39,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const approach = (value, target, amount) => value < target ? Math.min(value + amount, target) : Math.max(value - amount, target);
 
 function playerAt(x, y) {
-  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, onIce: false, onHay: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0 };
+  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, onIce: false, onHay: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0, inWater: false, leaping: false };
 }
 
 function loadLevel(game) {
@@ -162,6 +168,13 @@ export function iceUnder(level, surface, player) {
   return spans.some((span) => centre >= span.x && centre < span.x + span.w);
 }
 
+// The water zone the pup's middle is in, if any.
+export function waterAt(level, player) {
+  const x = player.x + player.w / 2;
+  const y = player.y + player.h / 2;
+  return (level.water ?? []).find((zone) => x >= zone.x && x < zone.x + zone.w && y >= zone.y && y < zone.y + zone.h) ?? null;
+}
+
 function nearPickup(player, item, radius) {
   return intersects(player, { x: item.x - radius, y: item.y - radius, w: radius * 2, h: radius * 2 });
 }
@@ -177,11 +190,23 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   p.coyote = p.grounded ? PHYSICS.coyoteTime : Math.max(0, p.coyote - dt);
   p.buffer = input.jumpPressed ? PHYSICS.jumpBuffer : Math.max(0, p.buffer - dt);
 
+  const water = waterAt(level, p);
+  if (water && !p.inWater) game.events.push({ type: "splash", x: p.x + p.w / 2, y: water.y });
+  p.inWater = Boolean(water);
+
   const direction = Number(Boolean(input.right)) - Number(Boolean(input.left));
   const grip = p.grounded && p.onIce ? ICE.traction : 1;
-  p.vx = approach(p.vx, direction * PHYSICS.speed * speedMultiplier(p), PHYSICS.acceleration * grip * dt);
+  p.vx = approach(p.vx, direction * PHYSICS.speed * speedMultiplier(p) * (water ? SWIM.speed : 1), PHYSICS.acceleration * grip * dt);
   if (direction) p.facing = direction;
-  if (p.buffer > 0 && p.coyote > 0) {
+  if (water && p.buffer > 0) {
+    const breach = p.y <= water.y + SWIM.breach;
+    p.vy = breach ? -PHYSICS.jump : Math.min(p.vy, -SWIM.stroke);
+    p.leaping = breach;
+    p.grounded = false;
+    p.coyote = 0;
+    p.buffer = 0;
+    game.events.push({ type: breach ? "splash" : "swim", x: p.x + p.w / 2, y: breach ? water.y : p.y });
+  } else if (p.buffer > 0 && p.coyote > 0) {
     const hay = p.grounded && p.onHay;
     p.vy = -(hay ? HAY.jump : PHYSICS.jump);
     p.grounded = false;
@@ -189,8 +214,14 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
     p.buffer = 0;
     game.events.push({ type: hay ? "hay-jump" : "jump", x: p.x + p.w / 2, y: p.y + p.h });
   }
-  if (!input.jumpHeld && p.vy < -PHYSICS.shortJump) p.vy = -PHYSICS.shortJump;
-  p.vy = Math.min(PHYSICS.maxFall, p.vy + PHYSICS.gravity * dt);
+  if (water) {
+    p.vy = Math.min(SWIM.maxFall, p.vy + SWIM.gravity * dt);
+  } else {
+    // A leap out of the water always clears the bank, so letting go of jump only shortens dry-land jumps.
+    if (p.vy >= 0) p.leaping = false;
+    if (!input.jumpHeld && !p.leaping && p.vy < -PHYSICS.shortJump) p.vy = -PHYSICS.shortJump;
+    p.vy = Math.min(PHYSICS.maxFall, p.vy + PHYSICS.gravity * dt);
+  }
   const previousBottom = p.y + p.h;
 
   p.x = clamp(p.x + p.vx * dt, 0, level.width - p.w);
@@ -240,7 +271,8 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
     if (!enemy.alive) continue;
     if (!tickScared(enemy, dt)) updateEnemy(enemy, dt, p);
     if (!intersects(p, enemy)) continue;
-    if (p.vy > 0 && previousBottom <= enemy.y + 5) {
+    // A puffed-up pufferfish is all spikes: landing on it hurts.
+    if (!enemy.puffed && p.vy > 0 && previousBottom <= enemy.y + 5) {
       enemy.alive = false;
       p.vy = -190;
       game.score += 10;

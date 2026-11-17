@@ -52,6 +52,18 @@ test("every game event with an effect maps to known bursts", () => {
   assert.equal(emit(system, "fireworks", 0, 0), 0);
 });
 
+test("splashing in and paddling make bubbles that float up instead of falling", () => {
+  const system = createParticles({ random: seeded() });
+  assert.ok(emitForEvent(system, { type: "splash", x: 50, y: 216 }) >= BURSTS.splash.count + BURSTS.bubbles.count);
+  clearParticles(system);
+  assert.ok(emitForEvent(system, { type: "swim", x: 50, y: 240 }) > 0);
+  const bubbles = activeParticles(system);
+  assert.ok(bubbles.every((particle) => particle.shape === "bubble"));
+  const ys = bubbles.map((particle) => particle.y);
+  updateParticles(system, 0.3);
+  assert.ok(bubbles.every((particle, i) => particle.y < ys[i]), "bubbles rise");
+});
+
 test("particles move, fall, fade, and expire", () => {
   const system = createParticles({ random: seeded() });
   emit(system, "sparkle", 100, 100);

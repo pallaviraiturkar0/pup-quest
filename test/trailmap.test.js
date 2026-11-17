@@ -5,7 +5,7 @@ import {
   trailPath, unlockAfterClear,
 } from "../src/trailmap.js";
 import { createGame, nextLevel, restartGame, startGame } from "../src/engine.js";
-import { BONUS_INDEX, BONUS_TRAILS, CANYON_INDEX, CANYON_TRAIL, LEVELS, SECRET_INDEX, TRAILS } from "../src/levels.js";
+import { BONUS_INDEX, BONUS_TRAILS, CANYON_INDEX, CANYON_TRAIL, LEVELS, REEF_INDEX, REEF_TRAIL, SECRET_INDEX, TRAILS } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
 
 const TOTAL = LEVELS.length;
@@ -128,23 +128,24 @@ test("the secret trail opens after beating the Mega-Vac or earning any gold paw"
 });
 
 test("once found, the secret trail is an extra open stop on the map, even with campaign trails still locked", () => {
-  const hidden = createTrailMap(2, TOTAL, 1, { bonus: 2 });
-  assert.equal(hidden.total, TOTAL + 2, "the map shows the campaign and Trails 08 and 09");
+  const hidden = createTrailMap(2, TOTAL, 1, { bonus: 3 });
+  assert.equal(hidden.total, TOTAL + 3, "the map shows the campaign and Trails 08, 09 and 10");
   assert.equal(chooseTrail(hidden, SECRET_INDEX), null);
-  const map = createTrailMap(2, TOTAL, 1, { bonus: 2, secret: true });
-  assert.equal(map.total, TOTAL + 3);
+  const map = createTrailMap(2, TOTAL, 1, { bonus: 3, secret: true });
+  assert.equal(map.total, TOTAL + 4);
   assert.equal(map.secretIndex, SECRET_INDEX);
   assert.equal(isStopOpen(map, SECRET_INDEX), true);
   assert.equal(isStopOpen(map, 2), false, "finding the secret never opens campaign trails");
   assert.equal(isStopOpen(map, BONUS_INDEX), false, "or Trail 08");
   assert.equal(isStopOpen(map, CANYON_INDEX), false, "or Trail 09");
+  assert.equal(isStopOpen(map, REEF_INDEX), false, "or Trail 10");
   assert.equal(chooseTrail(map, SECRET_INDEX), SECRET_INDEX);
   moveSelection(map, "End");
   assert.equal(map.selected, SECRET_INDEX);
-  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: 2, secret: true }).selected, SECRET_INDEX, "replaying it reopens the map on its stop");
-  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: 2 }).selected, 1, "a hidden secret falls back to the furthest open trail");
+  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: 3, secret: true }).selected, SECRET_INDEX, "replaying it reopens the map on its stop");
+  assert.equal(createTrailMap(2, TOTAL, SECRET_INDEX, { bonus: 3 }).selected, 1, "a hidden secret falls back to the furthest open trail");
   assert.equal(createTrailMap(2, TOTAL, TOTAL, { secret: true }).selected, TOTAL, "without a bonus stop the secret follows the campaign");
-  assert.equal(trailPath(TOTAL + 3).stops.length, TOTAL + 3);
+  assert.equal(trailPath(TOTAL + 4).stops.length, TOTAL + 4);
 });
 
 test("Trail 08 opens after Moonlit Keep is beaten, including for saves made before it existed, and never re-locks the campaign", () => {
@@ -171,7 +172,7 @@ test("Trail 08 opens after Moonlit Keep is beaten, including for saves made befo
 test("Trail 09 opens after Harvest Hollow is cleared, just like Trail 08 opens after Moonlit Keep", () => {
   const times = (entries = {}) => Array.from({ length: SECRET_INDEX + 1 }, (_, index) => entries[index] ?? null);
   const count = BONUS_TRAILS.length;
-  assert.equal(count, 2);
+  assert.equal(count, 3);
   assert.equal(TRAILS[CANYON_INDEX], CANYON_TRAIL);
   assert.equal(bonusTrailsOpen(times(), LEVELS, count), 0, "a fresh save keeps both locked");
   assert.equal(bonusTrailsOpen(null, LEVELS, count), 0);
@@ -182,11 +183,11 @@ test("Trail 09 opens after Harvest Hollow is cleared, just like Trail 08 opens a
   assert.equal(bonusTrailsOpen(times({ [BONUS_INDEX]: 50_000 }), LEVELS, count), 0, "a Harvest time without the finale opens nothing");
   assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 61_000, [BONUS_INDEX]: -1 }), LEVELS, count), 1, "tampered times are ignored");
   assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 61_000, [CANYON_INDEX]: 40_000 }), LEVELS, count), 1, "its own time cannot open it");
-  assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 1, [BONUS_INDEX]: 1, [CANYON_INDEX]: 1 }), LEVELS, count), 2, "never more than the bonus trails");
+  assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 1, [BONUS_INDEX]: 1, [CANYON_INDEX]: 1, [REEF_INDEX]: 1 }), LEVELS, count), count, "never more than the bonus trails");
   assert.equal(bonusTrailOpen(times({ [TOTAL - 1]: 61_000 }), LEVELS), true, "the single-trail check still works");
 
   const one = createTrailMap(TOTAL, TOTAL, CANYON_INDEX, { bonus: count, bonusOpen: 1, secret: true });
-  assert.equal(one.total, TOTAL + 3);
+  assert.equal(one.total, TOTAL + count + 1);
   assert.equal(one.secretIndex, SECRET_INDEX);
   assert.equal(isStopOpen(one, BONUS_INDEX), true);
   assert.equal(isStopOpen(one, CANYON_INDEX), false, "Trail 09 shows a padlock until Harvest Hollow is cleared");
@@ -199,4 +200,26 @@ test("Trail 09 opens after Harvest Hollow is cleared, just like Trail 08 opens a
   moveSelection(both, "End");
   assert.equal(both.selected, SECRET_INDEX);
   assert.equal(createTrailMap(TOTAL, TOTAL, 0, { bonus: count, bonusOpen: true }).bonusOpen, count, "`true` opens every bonus stop");
+});
+
+test("Trail 10 opens after Canyon Caper is cleared, and older saves keep their place", () => {
+  const times = (entries = {}) => Array.from({ length: SECRET_INDEX + 1 }, (_, index) => entries[index] ?? null);
+  const count = BONUS_TRAILS.length;
+  assert.equal(TRAILS[REEF_INDEX], REEF_TRAIL);
+  assert.equal(BONUS_TRAILS.at(-1), REEF_TRAIL, "Coral Cove is the last bonus trail to open");
+  const harvested = { [TOTAL - 1]: 61_000, [BONUS_INDEX]: 50_000 };
+  assert.equal(bonusTrailsOpen(times(harvested), LEVELS, count), 2, "a save from before Trail 10 existed keeps it locked until Canyon Caper is cleared");
+  assert.equal(bonusTrailsOpen(times({ ...harvested, [CANYON_INDEX]: 40_000 }), LEVELS, count), 3, "clearing Canyon Caper opens Coral Cove");
+  assert.equal(bonusTrailsOpen(times({ [TOTAL - 1]: 61_000, [CANYON_INDEX]: 40_000 }), LEVELS, count), 1, "Trail 09's time alone cannot skip Trail 08");
+  assert.equal(bonusTrailsOpen(times({ ...harvested, [REEF_INDEX]: 45_000 }), LEVELS, count), 2, "its own time cannot open it");
+
+  const locked = createTrailMap(TOTAL, TOTAL, REEF_INDEX, { bonus: count, bonusOpen: 2, secret: true });
+  assert.equal(isStopOpen(locked, CANYON_INDEX), true);
+  assert.equal(isStopOpen(locked, REEF_INDEX), false, "Trail 10 shows a padlock until Canyon Caper is cleared");
+  assert.equal(chooseTrail(locked, REEF_INDEX), null);
+  assert.equal(locked.selected, TOTAL - 1, "a locked Trail 10 falls back to the furthest campaign trail");
+  const open = createTrailMap(TOTAL, TOTAL, REEF_INDEX, { bonus: count, bonusOpen: 3, secret: true });
+  assert.equal(open.selected, REEF_INDEX, "replaying Trail 10 reopens the map on its stop");
+  assert.equal(chooseTrail(open, REEF_INDEX), REEF_INDEX);
+  assert.equal(open.secretIndex, SECRET_INDEX, "the secret stop still comes last");
 });

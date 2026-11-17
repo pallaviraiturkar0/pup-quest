@@ -27,6 +27,9 @@ export const SOUND_RECIPES = Object.freeze({
   // A sandstone ledge creaks when the pup lands, then gives way with a gritty rumble.
   "crumble-shake": [voice("triangle", 90, 70, 0, 0.12, 0.03), voice("noise", 1, 1, 0, 0.1, 0.012)],
   crumble: [voice("square", 80, 40, 0, 0.2, 0.035), voice("noise", 1, 1, 0, 0.25, 0.03)],
+  // A watery "sploosh" into or out of a lagoon, and a soft bubbly blip for each paddle stroke.
+  splash: [voice("noise", 1, 1, 0, 0.22, 0.04), voice("sine", 520, 160, 0, 0.18, 0.04)],
+  swim: [voice("sine", 260, 520, 0, 0.09, 0.035), voice("sine", 420, 760, 0.05, 0.07, 0.02)],
   land: [voice("sine", 140, 60, 0, 0.07, 0.05), voice("noise", 1, 1, 0, 0.03, 0.012)],
   treat: [voice("triangle", 988, 988, 0, 0.06, 0.06), voice("triangle", 1480, 1480, 0.055, 0.12, 0.06)],
   key: notes("square", [523, 659, 784, 1046], 0.07, 0.035),

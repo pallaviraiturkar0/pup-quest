@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createGame } from "../src/engine.js";
-import { BONUS_INDEX, BONUS_TRAIL, CANYON_INDEX, CANYON_TRAIL, LEVELS, SECRET_INDEX, SECRET_TRAIL, VIEW_WIDTH } from "../src/levels.js";
+import { BONUS_INDEX, BONUS_TRAIL, CANYON_INDEX, CANYON_TRAIL, GROUND_Y, LEVELS, REEF_INDEX, REEF_TRAIL, SECRET_INDEX, SECRET_TRAIL, VIEW_WIDTH } from "../src/levels.js";
 import { createRenderer } from "../src/render.js";
 import {
   DEFAULT_THEME, getTheme, LANDMARK_KINDS, LAYER_KINDS, PALETTE_KEYS, resolveColor,
@@ -126,6 +126,52 @@ test("tumbleweeds roll over time but hold still with reduced motion, and crumbli
   const solid = drawn(game, 1, true, sandstone);
   ledge.crumble.state = "fallen";
   assert.notEqual(drawn(game, 1, true, sandstone), solid, "a fallen ledge is not drawn");
+});
+
+test("the reef theme brings a lagoon sea, coral heads with leaping fish, and palms", () => {
+  assert.equal(themeForLevel(REEF_TRAIL), THEMES.reef);
+  assert.equal(getTheme("reef"), THEMES.reef);
+  const kinds = THEMES.reef.layers.map((layer) => layer.kind);
+  for (const kind of ["sun", "sea", "reef", "palms"]) assert.ok(kinds.includes(kind), kind);
+  const reef = THEMES.reef.layers.find((layer) => layer.kind === "reef");
+  for (const color of [...reef.colors, reef.fish]) assert.match(color, HEX);
+});
+
+test("fish leap and lagoon bubbles rise over time but hold still with reduced motion", () => {
+  const drawn = (game, time, reducedMotion, color) => {
+    const spots = [];
+    let fill = "";
+    const noop = () => {};
+    const ctx = {
+      globalAlpha: 1, font: "", imageSmoothingEnabled: false,
+      set fillStyle(value) { fill = value; }, get fillStyle() { return fill; },
+      fillRect(x, y) { if (fill === color) spots.push(`${x},${y}`); },
+      beginPath: noop, moveTo: noop, lineTo: noop, closePath: noop, fill: noop,
+      save: noop, restore: noop, translate: noop, scale: noop, fillText: noop,
+    };
+    createRenderer({ getContext: () => ctx }).render(game, time, 0, reducedMotion);
+    return spots.join(" ");
+  };
+  const game = createGame(REEF_INDEX);
+  const { fish } = THEMES.reef.layers.find((layer) => layer.kind === "reef");
+  assert.notEqual(drawn(game, 0.4, false, fish), drawn(game, 1.3, false, fish), "fish leap");
+  assert.equal(drawn(game, 0.4, true, fish), drawn(game, 1.3, true, fish));
+  // Put the widest lagoon on screen: its water is drawn, and its bubbles and grass only move with motion.
+  const lagoon = game.level.water.reduce((a, b) => (b.w > a.w ? b : a));
+  game.cameraX = lagoon.x - 40;
+  const { water, waterLight } = THEMES.reef.palette;
+  assert.ok(drawn(game, 1, true, water).split(" ").some((spot) => Number(spot.split(",")[0]) === lagoon.x), "the lagoon is filled with water");
+  assert.notEqual(drawn(game, 1, false, waterLight), drawn(game, 1.5, false, waterLight), "bubbles rise");
+  assert.equal(drawn(game, 1, true, waterLight), drawn(game, 1.5, true, waterLight));
+  // A plain gap beside the lagoons is a dark urchin pit, so it never looks swimmable.
+  const pit = game.level.gaps.find((gap) => !gap.water);
+  game.cameraX = pit.x - 40;
+  const inPit = (spots) => spots.split(" ").filter((spot) => {
+    const [x, y] = spot.split(",").map(Number);
+    return x >= pit.x && x < pit.x + pit.w && y > GROUND_Y;
+  });
+  assert.deepEqual(inPit(drawn(game, 1, true, water)), [], "no water in a plain gap");
+  assert.ok(inPit(drawn(game, 1, true, THEMES.reef.palette.stone)).length > 0, "urchins line the pit");
 });
 
 test("ice is drawn on the secret trail's slippery ground and ledges", () => {

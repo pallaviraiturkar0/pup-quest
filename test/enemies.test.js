@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CAT, ENEMY_TYPES, SWOOPERS, enemyReach, makeEnemy, SEAGULL, updateEnemy, VACUUM, vacuumSpots } from "../src/enemies.js";
+import { CAT, ENEMY_TYPES, SWOOPERS, enemyReach, makeEnemy, PUFFER, SEAGULL, updateEnemy, VACUUM, vacuumSpots } from "../src/enemies.js";
 import { createGame, intersects, startGame, stepGame } from "../src/engine.js";
 import { GROUND_Y, LEVELS } from "../src/levels.js";
 import { createRenderer } from "../src/render.js";
@@ -19,7 +19,7 @@ function run(enemy, seconds, player) {
   const trace = [];
   for (let t = 0; t < seconds; t += DT) {
     updateEnemy(enemy, DT, player);
-    trace.push({ x: enemy.x, y: enemy.y, mode: enemy.mode, swooping: enemy.swooping, warning: enemy.warning });
+    trace.push({ x: enemy.x, y: enemy.y, w: enemy.w, h: enemy.h, mode: enemy.mode, swooping: enemy.swooping, warning: enemy.warning, puffed: enemy.puffed });
   }
   return trace;
 }
@@ -58,7 +58,7 @@ function expectStompBounces(enemy) {
 }
 
 test("critters are built from data and reject unknown types or bad patrols", () => {
-  assert.deepEqual(ENEMY_TYPES, ["squirrel", "vacuum", "seagull", "cat", "vulture"]);
+  assert.deepEqual(ENEMY_TYPES, ["squirrel", "vacuum", "seagull", "cat", "vulture", "crab", "pufferfish"]);
   for (const type of ENEMY_TYPES) {
     const enemy = critter(type);
     assert.equal(enemy.type, type);
@@ -210,7 +210,7 @@ test("each critter's reach box covers every spot it visits", () => {
     const reach = enemyReach(enemy);
     const player = pup(ARENA_X + 30);
     for (const frame of run(enemy, 8, player)) {
-      const box = { x: frame.x, y: frame.y, w: enemy.w, h: enemy.h };
+      const box = { x: frame.x, y: frame.y, w: frame.w, h: frame.h };
       assert.ok(box.x >= reach.x - 1e-9 && box.x + box.w <= reach.x + reach.w + 1e-9, `${type} left its reach horizontally`);
       assert.ok(box.y >= reach.y - 0.5 && box.y + box.h <= reach.y + reach.h + 1e-9, `${type} left its reach vertically`);
       assert.ok(intersects(box, reach));
@@ -225,6 +225,9 @@ test("every critter draws in each of its moods using only hex colors", () => {
     critter("seagull"), { ...critter("seagull"), warning: true }, { ...critter("seagull"), swooping: true, y: GROUND_Y - 30 },
     critter("cat"), { ...critter("cat"), mode: "crouch" }, { ...critter("cat"), mode: "pounce", direction: -1 },
     critter("vulture"), { ...critter("vulture"), warning: true }, { ...critter("vulture"), swooping: true, y: GROUND_Y - 30 },
+    critter("crab"), { ...critter("crab"), direction: -1 },
+    critter("pufferfish"), { ...critter("pufferfish"), warning: true, direction: -1 },
+    { ...critter("pufferfish"), puffed: true, w: 22, h: 20 },
   ];
   for (const enemy of moods) {
     const fills = new Set();
@@ -244,4 +247,45 @@ test("every critter draws in each of its moods using only hex colors", () => {
     }
     for (const color of fills) assert.match(color, /^#[0-9a-f]{6}$/i, `${enemy.type} drew ${color}`);
   }
+});
+
+test("a pufferfish drifts and bobs, trembles as a warning, then puffs up evenly and holds still", () => {
+  const fish = critter("pufferfish");
+  const trace = run(fish, PUFFER.period * 2, null);
+  const puffed = trace.filter((frame) => frame.puffed);
+  assert.ok(puffed.length > 0 && trace.some((frame) => frame.warning), "it warns, then puffs");
+  const firstPuff = trace.findIndex((frame) => frame.puffed);
+  assert.equal(trace[firstPuff - 1].warning, true, "a warning always comes right before a puff");
+  assert.ok(puffed.every((frame) => frame.w === 14 + PUFFER.grow * 2 && frame.h === 12 + PUFFER.grow * 2));
+  // Puffing grows the body around its middle (give or take one frame of drifting) instead of sliding it.
+  const before = trace[firstPuff - 1];
+  const after = trace[firstPuff];
+  assert.ok(Math.abs(before.x + before.w / 2 - (after.x + after.w / 2)) <= fish.speed * DT + 1e-9);
+  const held = trace.slice(firstPuff, firstPuff + 20);
+  assert.ok(held.every((frame) => Math.abs(frame.x - after.x) < 1e-9), "it holds still while puffed");
+  const ys = trace.filter((frame) => !frame.puffed).map((frame) => frame.y);
+  assert.ok(Math.max(...ys) - Math.min(...ys) > PUFFER.bob / 2, "it bobs");
+  assert.ok(trace.some((frame) => frame.x !== trace[0].x), "it drifts along its patrol");
+});
+
+test("a calm pufferfish can be stomped, but a puffed one is too spiky and hurts", () => {
+  expectStompBounces(critter("pufferfish"));
+  const fish = critter("pufferfish");
+  run(fish, PUFFER.period - PUFFER.puffTime + 0.05, null);
+  assert.equal(fish.puffed, true);
+  const game = arena(fish);
+  place(game, fish.x + 2, fish.y - game.player.h - 0.5, 160);
+  stepGame(game, { jumpHeld: true }, DT);
+  assert.equal(fish.alive, true, "a puffed pufferfish cannot be stomped");
+  assert.equal(game.lives, 2);
+  expectSideHitHurts(critter("pufferfish"), GROUND_Y - 18);
+});
+
+test("crabs scuttle back and forth on the ground and can be stomped", () => {
+  const crab = critter("crab");
+  const trace = run(crab, 6, null);
+  assert.ok(trace.every((frame) => frame.y === GROUND_Y - 10));
+  assert.ok(Math.min(...trace.map((frame) => frame.x)) === crab.left && Math.max(...trace.map((frame) => frame.x)) === crab.right);
+  expectStompBounces(critter("crab"));
+  expectSideHitHurts(critter("crab"), GROUND_Y - 18);
 });

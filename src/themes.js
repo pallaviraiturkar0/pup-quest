@@ -11,7 +11,7 @@ export const PALETTE_KEYS = [
   "dirtDark", "stone", "water", "waterLight", "flower",
 ];
 
-export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps", "aurora", "glaciers", "snow", "harvest", "leaves", "mesas", "cacti", "tumbleweeds"];
+export const LAYER_KINDS = ["stars", "sun", "moon", "clouds", "birds", "sea", "hills", "dunes", "skyline", "castle", "trees", "palms", "hedges", "lamps", "aurora", "glaciers", "snow", "harvest", "leaves", "mesas", "cacti", "tumbleweeds", "reef"];
 export const SCATTER_KINDS = ["rock", "mushroom", "shell", "snowdrift", "pumpkin", "pebbles"];
 export const LANDMARK_KINDS = ["tree", "stump", "pillar", "palm", "bench", "hydrant", "snowman", "scarecrow", "saguaro"];
 
@@ -202,6 +202,26 @@ export const THEMES = {
       { kind: "tumbleweeds", parallax: 0.45, count: 3, color: "#b08a4e", highlight: "#d6b57a" },
     ],
     decor: { scatter: "pebbles", landmark: "saguaro", flowers: false },
+  },
+  reef: {
+    label: "Coral cove",
+    palette: {
+      sky: "#9fe0e4", horizon: "#e6f6d6", cloud: "#f6fbf4", cloudShade: "#d3ece8",
+      far: "#7fc0b4", hill: "#5fa98f", treeBack: "#5c9a6e", tree: "#3f8a5c",
+      treeLight: "#6fb878", trunk: "#a07a52", grass: "#e9d7a2", grassLight: "#f7ebc4",
+      grassDark: "#cdb57e", dirt: "#d8b98a", dirtLight: "#e8cfa3", dirtDark: "#b8956a",
+      stone: "#c99a8e", water: "#2c97b0", waterLight: "#9fe6ea", flower: "#ff8a7a",
+    },
+    layers: [
+      { kind: "sun", parallax: 0.02, color: "#fff2b0", halo: "#d8f2e0" },
+      { ...CLOUDS, count: 5 },
+      { kind: "birds", parallax: 0.14, count: 3, color: "#5b7d86" },
+      { kind: "sea", parallax: 0.04, top: 140, color: "water", foam: "waterLight" },
+      // Coral heads break the lagoon's surface while little fish leap between them.
+      { kind: "reef", parallax: 0.12, spacing: 120, top: 170, color: "stone", colors: ["#ff7f6e", "#f7b24f", "#c56fd0", "#ff9fb8"], fish: "#ffd45c" },
+      { kind: "palms", parallax: 0.34, spacing: 150 },
+    ],
+    decor: { scatter: "shell", landmark: "palm" },
   },
 };
 
