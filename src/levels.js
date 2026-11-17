@@ -285,7 +285,7 @@ export const CANYON_TRAIL = trail({
 export const REEF_TRAIL = trail({
   name: "Coral Cove", theme: "reef", columns: 176, par: [37, 50, 75], bonus: true,
   record: "10-reef",
-  gaps: [[16, 3], [30, 6, "water"], [50, 3], [66, 10, "water"], [92, 12, "water"], [120, 3], [134, 8, "water"], [152, 3]],
+  gaps: [[16, 3], [30, 8, "water"], [50, 3], [66, 10, "water"], [92, 12, "water"], [120, 3], [133, 9, "water"], [152, 3]],
   platforms: [
     [8, 11, 3], [12, 9, 3], [24, 11, 3], [39, 11, 3], [43, 9, 3], [58, 11, 4], [62, 9, 3],
     [80, 11, 3], [84, 9, 3], [108, 11, 3], [112, 9, 3], [126, 11, 4], [146, 11, 3], [158, 10, 3],
@@ -302,7 +302,7 @@ export const REEF_TRAIL = trail({
     [136, 236], [138, 250], [140, 236],
     [144, 188], [147, 164], [155, 164], [157, 188], [159, 148], [160, 148], [164, 188],
   ],
-  powerups: [["squeaky", 37, 188], ["bone", 85, 120], ["zoomies", 125, 188]],
+  powerups: [["squeaky", 40, 150], ["bone", 85, 120], ["zoomies", 144, 188]],
   key: [98, 250], checkpoint: 78,
   spikes: [[46, 1], [88, 1], [116, 1], [148, 1]],
   enemies: [

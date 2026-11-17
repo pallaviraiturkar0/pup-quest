@@ -200,7 +200,7 @@ const BONUS_COPY = {
   "10-reef": {
     won: ["CORAL COVE CLEARED", "Fin-tastic, good dog!", "cleared! You paddled across the lagoons, dodged the puffed-up pufferfish and dived for the golden key. Race it again to chase a shinier paw medal.", "Splash again"],
     reveal: "You hear waves lapping on a coral reef…",
-    needKey: "The golden key lies at the bottom of the widest lagoon: dive in and paddle down to it!",
+    needKey: "The golden key lies at the bottom of the widest lagoon: stop paddling to sink down to it, then paddle back up!",
     intro: "Jump into a lagoon to swim. Tap jump to paddle up, and tap it near the surface to leap out. Puffed-up pufferfish are too spiky to stomp!",
     unlock: "BEAT CANYON CAPER TO OPEN",
   },

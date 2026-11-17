@@ -481,6 +481,45 @@ test("near the surface a jump press leaps clean out of the lagoon onto the bank"
   assert.equal(game.player.inWater, false);
 });
 
+test("a tapped leap out of the water still clears the bank, while a tapped dry jump stays short", () => {
+  const { game, lagoon } = inLagoon(0);
+  place(game, lagoon.x + lagoon.w - 40, lagoon.y);
+  tick(game);
+  tick(game, { jumpPressed: true, right: true });
+  let peak = game.player.y;
+  for (let t = 0; t < 1.5 && !game.player.grounded; t += 1 / 120) {
+    tick(game, { right: true });
+    peak = Math.min(peak, game.player.y);
+  }
+  assert.equal(game.lives, 3);
+  assert.equal(game.player.y, GROUND_Y - game.player.h, "landed on the far bank");
+  assert.ok(peak < GROUND_Y - game.player.h - 24, "a full-height leap, not a short hop");
+  // On dry land the same tap is still cut short.
+  tick(game, { jumpPressed: true });
+  for (let t = 0; t < 0.1; t += 1 / 120) tick(game);
+  assert.ok(game.player.vy >= -PHYSICS.shortJump);
+});
+
+test("no running jump from the bank clears a Coral Cove lagoon without swimming", () => {
+  const { level } = createGame(REEF_INDEX);
+  for (const lagoon of level.water) {
+    // Try taking off on every frame of a full-speed run-up to the water's edge, holding jump for the longest leap.
+    for (let takeoff = 0; takeoff < 200; takeoff += 1) {
+      const game = createGame(REEF_INDEX);
+      startGame(game);
+      Object.assign(game.level, { enemies: [], spikes: [] });
+      place(game, lagoon.x - 140, GROUND_Y - game.player.h);
+      let wet = false;
+      for (let frame = 0; frame < 400 && game.lives === 3; frame += 1) {
+        tick(game, { right: true, jumpPressed: frame === takeoff, jumpHeld: frame >= takeoff });
+        wet ||= game.player.inWater;
+        if (game.player.grounded && game.player.x > lagoon.x + lagoon.w - game.player.w) break;
+      }
+      assert.ok(wet || game.lives < 3 || game.player.x < lagoon.x + lagoon.w - game.player.w, `jumped the ${lagoon.w}px lagoon at ${lagoon.x} (take-off frame ${takeoff})`);
+    }
+  }
+});
+
 test("a pup that stops paddling sinks out of view and loses a heart", () => {
   const { game } = inLagoon(20);
   for (let t = 0; t < 4 && game.lives === 3; t += 1 / 120) tick(game);

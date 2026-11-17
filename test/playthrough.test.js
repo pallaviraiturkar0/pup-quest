@@ -112,15 +112,15 @@ const CANYON_ROUTE = [
 ];
 
 // Coral Cove, the bonus Trail 10: ["swim", x, y] paddles to that spot, ["dive", x, y, clearance] treads water
-// until the lagoon's pufferfish is `clearance` pixels from x and then dives, and ["leap"] jumps out onto the bank.
-// The pup dives to the bottom of the third lagoon for the golden key.
+// until the lagoon's pufferfish is `clearance` pixels from x and then sinks to y, and ["leap"] taps jump at the
+// surface to leap out onto the bank. The pup dives to the bottom of the third lagoon for the golden key.
 const REEF_ROUTE = [
   [120, 208], [140, 176, true], [220, 144, true], [316, 208, true], [400, 176, true], [470, 208, true],
-  ["swim", 500, 206], ["swim", 555, 206], ["leap"], [600, 208], [640, 176, true], [700, 144, true], [780, 208, true],
+  ["swim", 500, 206], ["swim", 585, 206], ["leap"], [640, 176], [700, 144, true], [780, 208, true],
   [858, 208, true], [940, 176, true], [1000, 144, true], ["swim", 1070, 206], ["swim", 1195, 206], ["leap"],
   [1250, 208], [1290, 176, true], [1350, 144, true], ["dive", 1580, 236, 30], ["swim", 1645, 206], ["leap"],
-  [1740, 176, true], [1800, 144, true], [1900, 208, true], [1990, 208, true], [2030, 176, true], ["swim", 2160, 206],
-  ["swim", 2232, 206], ["leap"], [2345, 176, true], [2420, 208, true], [2500, 208, true], [2545, 160, true],
+  [1740, 176, true], [1800, 144, true], [1900, 208, true], [1990, 208, true], [2030, 176, true], ["swim", 2150, 206],
+  ["swim", 2250, 206], ["leap"], [2345, 176, true], [2420, 208, true], [2500, 208, true], [2545, 160, true],
   [2650, 208, true], [2730, 208],
 ];
 
@@ -141,16 +141,16 @@ function swim(game, x, y, ready = () => true) {
   assert.fail(`${game.level.name}: cannot swim to ${x}/${y}; stopped at ${game.player.x.toFixed(1)}/${game.player.y.toFixed(1)}`);
 }
 
-// Paddles up to the surface, then holds jump and right to leap out onto the next bank.
+// Paddles up to the surface, then taps jump (without holding it) while running right to leap onto the next bank.
 function leap(game) {
   for (let frame = 0; frame < 600; frame += 1) {
     const p = game.player;
     const water = waterAt(game.level, p);
     const breach = Boolean(water) && p.y <= water.y + SWIM.breach;
-    stepGame(game, { right: true, jumpPressed: breach || (p.vy > 0 && frame % 14 === 0), jumpHeld: breach }, 1 / 120);
+    stepGame(game, { right: true, jumpPressed: breach || (p.vy > 0 && frame % 14 === 0) }, 1 / 120);
     game.events.length = 0;
     if (breach) {
-      for (let air = 0; air < 240 && !game.player.grounded; air += 1) stepGame(game, { right: true, jumpHeld: true }, 1 / 120);
+      for (let air = 0; air < 240 && !game.player.grounded; air += 1) stepGame(game, { right: true }, 1 / 120);
       assert.equal(game.deaths, 0, `${game.level.name}: lost a life leaping out of the water`);
       return;
     }

@@ -27,7 +27,8 @@ export const HAY = Object.freeze({ jump: 340 });
 
 // In a flooded lagoon the pup swims: gravity is gentle and it sinks slowly, so every jump press is a
 // paddle stroke upward. Near the surface (head within `breach` pixels of it) a press is a full jump
-// that leaps out of the water. Sinking past the bottom of the screen still costs a life.
+// that leaps out of the water, full height even if jump is only tapped. Sinking past the bottom of the
+// screen still costs a life.
 export const SWIM = Object.freeze({ gravity: 240, maxFall: 70, stroke: 125, speed: 0.75, breach: 4 });
 
 export function intersects(a, b) {
@@ -38,7 +39,7 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const approach = (value, target, amount) => value < target ? Math.min(value + amount, target) : Math.max(value - amount, target);
 
 function playerAt(x, y) {
-  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, onIce: false, onHay: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0, inWater: false };
+  return { x, y, w: 14, h: 18, vx: 0, vy: 0, facing: 1, grounded: false, onIce: false, onHay: false, coyote: 0, buffer: 0, invincible: 0, stride: 0, zoomies: 0, inWater: false, leaping: false };
 }
 
 function loadLevel(game) {
@@ -200,6 +201,7 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   if (water && p.buffer > 0) {
     const breach = p.y <= water.y + SWIM.breach;
     p.vy = breach ? -PHYSICS.jump : Math.min(p.vy, -SWIM.stroke);
+    p.leaping = breach;
     p.grounded = false;
     p.coyote = 0;
     p.buffer = 0;
@@ -215,7 +217,9 @@ export function stepGame(game, input = {}, dt = 1 / 120) {
   if (water) {
     p.vy = Math.min(SWIM.maxFall, p.vy + SWIM.gravity * dt);
   } else {
-    if (!input.jumpHeld && p.vy < -PHYSICS.shortJump) p.vy = -PHYSICS.shortJump;
+    // A leap out of the water always clears the bank, so letting go of jump only shortens dry-land jumps.
+    if (p.vy >= 0) p.leaping = false;
+    if (!input.jumpHeld && !p.leaping && p.vy < -PHYSICS.shortJump) p.vy = -PHYSICS.shortJump;
     p.vy = Math.min(PHYSICS.maxFall, p.vy + PHYSICS.gravity * dt);
   }
   const previousBottom = p.y + p.h;
