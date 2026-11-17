@@ -469,6 +469,34 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
         rect(x + 2, spin ? y + 2 : y - 3, 2, 1, light);
       }
     },
+    reef(layer, game, time, theme) {
+      const { spacing, top } = layer;
+      const scroll = game.cameraX * layer.parallax;
+      const rock = resolveColor(theme, layer.color);
+      for (let i = -1; i < Math.ceil(VIEW_WIDTH / spacing) + 2; i += 1) {
+        const index = i + Math.floor(scroll / spacing);
+        const x = Math.round(i * spacing - (scroll % spacing) + noise(index + 250) * 40);
+        const w = 26 + Math.round(noise(index + 251) * 22);
+        polygon([[x - 4, top + 14], [x + 3, top + 2], [x + w - 3, top + 2], [x + w + 4, top + 14]], rock);
+        // Branching coral in a few bright colours.
+        for (let b = 0; b < 4; b += 1) {
+          const color = layer.colors[Math.floor(noise(index * 4 + b + 252) * layer.colors.length)];
+          const bx = x + 3 + Math.round((w - 8) * b / 3);
+          const h = 6 + Math.round(noise(index * 4 + b + 253) * 9);
+          rect(bx, top + 2 - h, 2, h, color);
+          rect(bx - 2, top - h + 3, 2, 2, color);
+          rect(bx + 2, top - h + 5, 2, 2, color);
+        }
+        // Now and then a fish arcs out of the water beside the coral.
+        const hop = wrap(time * 0.7 + noise(index + 254) * 4, 4);
+        if (hop < 1) {
+          const fx = x + w + 6 + Math.round(hop * 22);
+          const fy = top + 4 - Math.round(Math.sin(hop * Math.PI) * 16);
+          rect(fx, fy, 5, 3, layer.fish);
+          rect(fx - 2, fy - 1 + Math.round(hop * 2), 2, 2, layer.fish);
+        }
+      }
+    },
     lamps(layer, game, time, theme) {
       const { spacing } = layer;
       const scroll = game.cameraX * layer.parallax;
@@ -973,7 +1001,100 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     ctx.restore();
   }
 
-  const CRITTERS = { squirrel: critter, vacuum, seagull, cat, vulture };
+  // A beach crab scuttles sideways, claws up, eyes on stalks.
+  function crab(enemy, time) {
+    ctx.save();
+    ctx.translate(Math.round(enemy.x), Math.round(enemy.y));
+    const step = Math.floor(time * 10) % 2;
+    const snap = Math.floor(time * 3) % 2;
+    rect(3, 3, 12, 5, "#d9503f");
+    rect(5, 2, 8, 2, "#ee6e57");
+    rect(6, 0, 1, 3, "#d9503f");
+    rect(11, 0, 1, 3, "#d9503f");
+    rect(5, -1, 3, 2, "#fff6e8");
+    rect(10, -1, 3, 2, "#fff6e8");
+    rect(6, -1, 1, 1, "#22282a");
+    rect(11, -1, 1, 1, "#22282a");
+    rect(0, 1 + snap, 3, 3, "#ee6e57");
+    rect(15, 1 + snap, 3, 3, "#ee6e57");
+    rect(1, 4, 2, 2, "#d9503f");
+    rect(15, 4, 2, 2, "#d9503f");
+    for (let i = 0; i < 3; i += 1) {
+      rect(3 + i * 2 - step, 8, 1, 2, "#b33f33");
+      rect(14 - i * 2 + step, 8, 1, 2, "#b33f33");
+    }
+    ctx.restore();
+  }
+
+  // A pufferfish: a round yellow fish that trembles as a warning, then puffs up into a spiky ball.
+  function pufferfish(enemy, time) {
+    const shake = enemy.warning ? (Math.floor(time * 30) % 2 ? 1 : -1) : 0;
+    facing({ ...enemy, x: enemy.x + shake });
+    const { w, h } = enemy;
+    const body = enemy.puffed ? "#f6d35b" : "#f2c14e";
+    rect(2, 1, w - 4, h - 2, body);
+    rect(1, 3, w - 2, h - 6, body);
+    rect(3, h - 4, w - 7, 2, "#fff0b8");
+    rect(-2, h / 2 - 2, 3, 4, "#e09a3a");
+    rect(w - 5, 3, 2, 2, "#22282a");
+    rect(w - 2, h / 2, 2, 1, "#c4632f");
+    if (enemy.puffed) {
+      for (let i = 0; i < 4; i += 1) {
+        const along = 3 + Math.round((w - 8) * i / 3);
+        rect(along, -2, 1, 3, "#8f6a2c");
+        rect(along, h - 1, 1, 3, "#8f6a2c");
+      }
+      rect(-1, 2, 2, 1, "#8f6a2c");
+      rect(w - 1, h - 4, 2, 1, "#8f6a2c");
+    } else {
+      rect(4, 2 + Math.floor(time * 6) % 2, 4, 2, "#e09a3a");
+    }
+    ctx.restore();
+  }
+
+  const CRITTERS = { squirrel: critter, vacuum, seagull, cat, vulture, crab, pufferfish };
+
+  // A flooded lagoon: deep water with a sandy floor and swaying sea grass behind everything in it.
+  function lagoon(zone, palette, time) {
+    rect(zone.x, zone.y, zone.w, VIEW_HEIGHT - zone.y, palette.water);
+    rect(zone.x, VIEW_HEIGHT - 5, zone.w, 5, palette.dirtDark);
+    for (let x = zone.x + 6; x < zone.x + zone.w - 4; x += 19) {
+      const sway = Math.round(Math.sin(time * 1.5 + x * 0.1) * 2);
+      const h = 10 + Math.round(noise(x) * 12);
+      rect(x, VIEW_HEIGHT - 4 - h, 2, h, palette.tree);
+      rect(x + sway, VIEW_HEIGHT - 4 - h - 4, 2, 5, palette.treeLight);
+    }
+  }
+
+  // The lagoon's surface and a soft tint drawn over the pup and critters, so they look submerged.
+  function urchinPit(gap, palette) {
+    rect(gap.x, GROUND_Y, gap.w, VIEW_HEIGHT - GROUND_Y, palette.dirtDark);
+    rect(gap.x, VIEW_HEIGHT - 10, gap.w, 10, palette.trunk);
+    for (let x = gap.x + 3; x + 9 <= gap.x + gap.w; x += 12) {
+      rect(x + 2, VIEW_HEIGHT - 16, 5, 6, palette.stone);
+      rect(x + 4, VIEW_HEIGHT - 21, 1, 5, palette.stone);
+      rect(x, VIEW_HEIGHT - 18, 2, 1, palette.stone);
+      rect(x + 7, VIEW_HEIGHT - 18, 2, 1, palette.stone);
+    }
+  }
+
+  function lagoonFront(zone, palette, time) {
+    ctx.globalAlpha = 0.28;
+    rect(zone.x, zone.y + 2, zone.w, VIEW_HEIGHT - zone.y - 2, palette.waterLight);
+    ctx.globalAlpha = 1;
+    rect(zone.x, zone.y, zone.w, 2, palette.waterLight);
+    for (let i = 0; i < zone.w / 24; i += 1) {
+      const x = zone.x + wrap(i * 24 + Math.floor(time * 6), zone.w - 6);
+      rect(x, zone.y - 1, 6, 1, palette.waterLight);
+    }
+    // A few bubbles drift up from the floor.
+    for (let i = 0; i < zone.w / 40; i += 1) {
+      const depth = VIEW_HEIGHT - zone.y - 8;
+      const y = zone.y + 4 + wrap(depth - time * 14 - noise(zone.x + i) * depth, depth);
+      const x = zone.x + 6 + noise(zone.x + i + 7) * (zone.w - 12) + Math.sin(time * 3 + i) * 2;
+      rect(x, y, 2, 2, palette.waterLight);
+    }
+  }
 
   // Stone posts mark a boss arena's walls (holding up the Mega-Vac's safe ledges).
   function arenaWalls(boss, palette) {
@@ -1235,7 +1356,15 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
     background(game, decorativeTime, theme, reducedMotion);
     ctx.save();
     ctx.translate(-Math.floor(game.cameraX), 0);
+    for (const zone of game.level.water ?? []) lagoon(zone, palette, decorativeTime);
+    const lagoons = Boolean(game.level.water?.length);
     for (const gap of game.level.gaps) {
+      if (gap.water) continue;
+      // Beside swimmable lagoons, a plain gap is a dark pit of sea urchins so it never looks like water.
+      if (lagoons) {
+        urchinPit(gap, palette);
+        continue;
+      }
       rect(gap.x, GROUND_Y + 13, gap.w, 50, palette.water);
       rect(gap.x, GROUND_Y + 13, gap.w, 2, palette.waterLight);
       for (let row = 0; row < 4; row += 1) {
@@ -1292,6 +1421,7 @@ export function createRenderer(canvas, { themeOverride = null } = {}) {
       ctx.globalAlpha = 1;
     }
     puppy(game.player, time, game.status === "ready", decorativeTime);
+    for (const zone of game.level.water ?? []) lagoonFront(zone, palette, decorativeTime);
     if (reducedMotion) calmParticles(particles);
     if (game.status !== "paused") updateParticles(particles, dt);
     for (const particle of activeParticles(particles)) drawParticle(particle);

@@ -5,7 +5,7 @@ import {
   recordBestTime, recordKeys, runMs, serializeBestTimes, spokenTime, withSaveLock,
 } from "../src/medals.js";
 import { createGame, pauseGame, resumeGame, startGame, stepGame } from "../src/engine.js";
-import { BONUS_INDEX, CANYON_INDEX, LEVELS, SECRET_INDEX, TRAILS } from "../src/levels.js";
+import { BONUS_INDEX, CANYON_INDEX, LEVELS, REEF_INDEX, SECRET_INDEX, TRAILS } from "../src/levels.js";
 import { contrastRatio } from "../src/trailmap.js";
 
 const TOTAL = LEVELS.length;
@@ -91,6 +91,23 @@ test("Trail 09 saves its best time under 9-canyon, and the secret trail keeps it
   const times = [...loaded];
   times[CANYON_INDEX] = 40_000;
   assert.match(commitBestTimes(times, old, keys).raw, /"9-canyon":40000/);
+});
+
+test("Trail 10 saves its best time under 10-reef, and older saves keep every record", () => {
+  const keys = recordKeys(TRAILS);
+  assert.equal(keys[REEF_INDEX], "10-reef");
+  assert.equal(keys[CANYON_INDEX], "9-canyon");
+  assert.equal(keys[SECRET_INDEX], "8-yeti", "the secret trail keeps its key after moving along again");
+  assert.equal(new Set(keys).size, keys.length);
+  // A save from before Trail 10: every record stays put, and "10" or "11" are never read as Coral Cove times.
+  const old = '{"7":61000,"8-harvest":31000,"9-canyon":40000,"8-yeti":30000,"10":12000,"11":9000}';
+  const loaded = parseBestTimes(old, keys);
+  assert.deepEqual([loaded[BONUS_INDEX], loaded[CANYON_INDEX], loaded[SECRET_INDEX], loaded[REEF_INDEX]], [31_000, 40_000, 30_000, null]);
+  const times = [...loaded];
+  times[REEF_INDEX] = 45_000;
+  const raw = commitBestTimes(times, old, keys).raw;
+  assert.match(raw, /"10-reef":45000/);
+  assert.match(raw, /"9-canyon":40000/);
 });
 
 test("saved best times survive missing, corrupt, and tampered data", () => {

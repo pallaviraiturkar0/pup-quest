@@ -147,6 +147,7 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .castle-icon { color: #8f8aa8; }
 .autumn-icon { color: #b8906a; }
 .canyon-icon { color: #c08a72; }
+.reef-icon { color: #e08a7e; }
 .trail.active .forest-icon { color: #718a66; }
 .trail.active .night-icon { color: #9392b8; }
 .trail.active .park-icon { color: #5f9a5c; }
@@ -155,6 +156,7 @@ kbd { display: inline-block; font: 10px var(--mono); padding: 3px 5px; min-width
 .trail.active .castle-icon { color: #d0596b; }
 .trail.active .autumn-icon { color: #d9772e; }
 .trail.active .canyon-icon { color: #c0532f; }
+.trail.active .reef-icon { color: #2c97b0; }
 .trail.finale, .trail.bonus { grid-column: 1 / -1; }
 .trail-state { color: #a4b593; margin-left: auto; font-size: 10px; }
 .below-game { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0 26px; }

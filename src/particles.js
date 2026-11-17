@@ -13,6 +13,7 @@ const SNOW = ["#ffffff", "#e6eff4", "#b9e1f2"];
 const HEARTS = ["#ef6f6c", "#f29bb2"];
 const STRAW = ["#e2bf62", "#f3dc8d", "#c09a45"];
 const SAND = ["#c0683f", "#d48352", "#ecc58c"];
+const WATER = ["#e6fbff", "#9fe6ea", "#5fc3d3"];
 
 // Each burst describes how many particles to spawn and how they move.
 // `still` bursts are the reduced-motion fallback: a few motionless sparkles.
@@ -27,6 +28,10 @@ export const BURSTS = Object.freeze({
   hearts: { count: 12, shape: "heart", colors: HEARTS, spreadX: 90, liftMin: 30, liftMax: 80, life: [1, 1.6], size: [1, 1], gravity: 30, reduced: 3 },
   straw: { count: 8, shape: "square", colors: STRAW, spreadX: 60, liftMin: 10, liftMax: 40, life: [0.3, 0.5], size: [1, 2], gravity: GRAVITY, reduced: 0 },
   sand: { count: 12, shape: "square", colors: SAND, spreadX: 50, liftMin: 2, liftMax: 24, life: [0.4, 0.7], size: [1, 3], gravity: GRAVITY, reduced: 0 },
+  // Spray thrown up where the pup splashes into or leaps out of a lagoon.
+  splash: { count: 12, shape: "square", colors: WATER, spreadX: 70, liftMin: 40, liftMax: 110, life: [0.35, 0.6], size: [1, 2], gravity: 300, reduced: 0 },
+  // Little rings that float upward from a paddling pup.
+  bubbles: { count: 4, shape: "bubble", colors: WATER, spreadX: 18, liftMin: 10, liftMax: 24, life: [0.6, 1], size: [1, 1], gravity: -30, reduced: 0 },
   paws: { count: 14, shape: "paw", colors: PAWS, spreadX: 150, liftMin: 50, liftMax: 120, life: [1, 1.6], size: [1, 1], gravity: 90, reduced: 0 },
 });
 
@@ -36,6 +41,8 @@ export const EVENT_BURSTS = Object.freeze({
   jump: ["dust"],
   "hay-jump": ["straw"],
   crumble: ["sand"],
+  splash: ["splash", "bubbles"],
+  swim: ["bubbles"],
   treat: ["sparkle"],
   powerup: ["big-sparkle"],
   key: ["big-sparkle"],
@@ -141,6 +148,7 @@ export function particleAlpha(particle) {
 // Small pixel masks used by the renderer, as [x, y] offsets.
 export const SHAPE_PIXELS = Object.freeze({
   sparkle: [[0, -1], [-1, 0], [0, 0], [1, 0], [0, 1]],
+  bubble: [[0, -1], [-1, 0], [1, 0], [0, 1]],
   heart: [[-1, -1], [1, -1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]],
   paw: [[-1, -2], [1, -2], [-2, -1], [2, -1], [-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1]],
 });

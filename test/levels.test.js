@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { enemyReach, SWOOPERS } from "../src/enemies.js";
-import { HAY, ICE, intersects, PHYSICS } from "../src/engine.js";
-import { BONUS_INDEX, BONUS_TRAIL, CANYON_INDEX, CANYON_TRAIL, GROUND_Y, LEVELS, SECRET_INDEX, SECRET_TRAIL, TILE, TRAILS, VIEW_HEIGHT } from "../src/levels.js";
+import { enemyReach, SWIMMERS, SWOOPERS } from "../src/enemies.js";
+import { HAY, ICE, intersects, PHYSICS, SWIM } from "../src/engine.js";
+import { BONUS_INDEX, BONUS_TRAIL, CANYON_INDEX, CANYON_TRAIL, GROUND_Y, LEVELS, REEF_INDEX, REEF_TRAIL, SECRET_INDEX, SECRET_TRAIL, TILE, TRAILS, VIEW_HEIGHT } from "../src/levels.js";
 import { THEMES } from "../src/themes.js";
 
 const PUPPY = { w: 14, h: 18 };
@@ -14,11 +14,16 @@ const jumpHeight = (v) => v ** 2 / (2 * PHYSICS.gravity);
 const JUMP_HEIGHT = jumpHeight(PHYSICS.jump);
 // Hay bales launch a much bigger jump; `useHay: false` checks a trail with ordinary jumps only.
 const takeoff = (surface, useHay = true) => (useHay && surface.hay ? HAY.jump : PHYSICS.jump);
+// A swimming pup can leap out of the water once its head is within SWIM.breach of the surface, so its
+// feet may still be this far below the water line when it jumps.
+const BREACH_DEPTH = SWIM.breach + PUPPY.h;
 
 function surfacesOf(level) {
   return [
     ...level.ground.map((block, index) => ({ id: `ground ${index}`, x0: block.x, x1: block.x + block.w, y: block.y, hay: false })),
     ...level.platforms.map((block, index) => ({ id: `platform ${index}`, x0: block.x, x1: block.x + block.w, y: block.y, hay: Boolean(block.hay), crumble: Boolean(block.crumble) })),
+    // A flooded lagoon counts as one place: once in, the pup can swim anywhere in it.
+    ...(level.water ?? []).map((zone, index) => ({ id: `water ${index}`, x0: zone.x, x1: zone.x + zone.w, y: zone.y, hay: false, water: true })),
   ];
 }
 
@@ -30,6 +35,8 @@ function horizontalReach(rise, v = PHYSICS.jump) {
 }
 
 function canHop(from, to, useHay = true) {
+  // Leaving a lagoon is a jump from a little way below its surface.
+  if (from.water) from = { ...from, y: from.y + BREACH_DEPTH };
   const v = takeoff(from, useHay);
   const rise = from.y - to.y;
   if (rise > jumpHeight(v) - RISE_MARGIN) return false;
@@ -66,12 +73,18 @@ function reachableSurfaces(level, useHay = true) {
 }
 
 function canTouch(surface, point, useHay = true) {
+  // In a lagoon the pup can paddle anywhere from its floor up to a leap out of the water.
+  if (surface.water) {
+    return point.x >= surface.x0 - PICKUP_RADIUS && point.x <= surface.x1 + PICKUP_RADIUS &&
+      point.y + PICKUP_RADIUS >= surface.y + BREACH_DEPTH - PUPPY.h - JUMP_HEIGHT + RISE_MARGIN && point.y <= VIEW_HEIGHT;
+  }
   const top = surface.y - PUPPY.h - jumpHeight(takeoff(surface, useHay)) + RISE_MARGIN;
   return point.x >= surface.x0 - PICKUP_RADIUS && point.x <= surface.x1 + PICKUP_RADIUS &&
     point.y + PICKUP_RADIUS >= top && point.y - PICKUP_RADIUS <= surface.y;
 }
 
 const solids = (level) => [...level.ground, ...level.platforms];
+const inWater = (level, point) => (level.water ?? []).some((zone) => intersects(box(point), zone));
 const box = (point, radius = 1) => ({ x: point.x - radius, y: point.y - radius, w: radius * 2, h: radius * 2 });
 
 test("the campaign has seven uniquely named trails and the newer ones use the park, beach, night city, and castle themes", () => {
@@ -107,7 +120,8 @@ test("every level object stays inside the level bounds", () => {
     inside(level.exit, "exit");
     inside(level.start, "start");
     assert.ok(level.platforms.every((platform) => platform.y < GROUND_Y), `${level.name}: platform below ground`);
-    assert.ok([...level.treats, ...level.powerups].every((item) => item.y < GROUND_Y) && level.key.y < GROUND_Y, `${level.name}: pickup below ground`);
+    // Only a flooded lagoon hides pickups below the ground line.
+    assert.ok([...level.treats, ...level.powerups, level.key].every((item) => item.y < GROUND_Y || inWater(level, item)), `${level.name}: pickup below ground`);
   }
 });
 
@@ -135,7 +149,13 @@ test("hazards sit on solid ground and critters never wander out over water", () 
     for (const spike of level.spikes) {
       assert.ok(level.ground.some((ground) => spike.x >= ground.x && spike.x + spike.w <= ground.x + ground.w), `${level.name}: spike at ${spike.x} floats over a gap`);
     }
-    for (const enemy of level.enemies.filter((critter) => !SWOOPERS.includes(critter.type))) {
+    for (const enemy of level.enemies.filter((critter) => SWIMMERS.includes(critter.type))) {
+      // Swimmers stay underwater inside their own lagoon.
+      const reach = enemyReach(enemy);
+      assert.ok((level.water ?? []).some((zone) => reach.x >= zone.x && reach.x + reach.w <= zone.x + zone.w && reach.y >= zone.y),
+        `${level.name}: ${enemy.type} at ${enemy.x} swims out of its lagoon`);
+    }
+    for (const enemy of level.enemies.filter((critter) => !SWOOPERS.includes(critter.type) && !SWIMMERS.includes(critter.type))) {
       // Walkers keep their whole hitbox on the ground or rooftop they patrol.
       const [from, to] = enemy.floor === GROUND_Y
         ? [enemy.left + enemy.w / 2, enemy.right + enemy.w / 2]
@@ -187,7 +207,7 @@ test("Frosty Fjord is a secret arctic trail kept outside the campaign", () => {
   assert.equal(SECRET_TRAIL.name, "Frosty Fjord");
   assert.equal(SECRET_TRAIL.theme, "arctic");
   assert.equal(SECRET_TRAIL.secret, true);
-  assert.equal(SECRET_INDEX, LEVELS.length + 2, "it comes after the bonus Trails 08 and 09");
+  assert.equal(SECRET_INDEX, LEVELS.length + 3, "it comes after the bonus Trails 08, 09 and 10");
   assert.equal(TRAILS[SECRET_INDEX], SECRET_TRAIL);
   assert.ok(LEVELS.every((level) => !level.secret && level.ice.length === 0 && level.platforms.every((platform) => !platform.ice)),
     "campaign trails keep their grip");
@@ -269,6 +289,45 @@ test("Canyon Caper's crumbling ledges matter: the wide canyons and the golden ke
   assert.equal(wide.length, 3, "three wide canyons");
   for (const gap of wide) {
     assert.ok(ledges.some((ledge) => ledge.x >= gap.x && ledge.x + ledge.w <= gap.x + gap.w), `canyon at ${gap.x} has a crumbling ledge`);
+  }
+});
+
+test("Coral Cove is Trail 10: a coral reef bonus trail after Canyon Caper, with crabs, pufferfish and flooded lagoons", () => {
+  assert.equal(REEF_TRAIL.name, "Coral Cove");
+  assert.equal(REEF_TRAIL.theme, "reef");
+  assert.equal(REEF_INDEX, CANYON_INDEX + 1);
+  assert.equal(TRAILS[REEF_INDEX], REEF_TRAIL);
+  assert.equal(REEF_TRAIL.bonus, true);
+  assert.equal(REEF_TRAIL.secret, false);
+  assert.equal(REEF_TRAIL.boss, null);
+  assert.equal(REEF_TRAIL.record, "10-reef");
+  assert.ok(!LEVELS.includes(REEF_TRAIL), "the campaign is still seven trails");
+  assert.ok(REEF_TRAIL.width >= CANYON_TRAIL.width, "at least as long as Trail 09");
+  assert.deepEqual(new Set(REEF_TRAIL.enemies.map((enemy) => enemy.type)), new Set(["crab", "pufferfish"]));
+  assert.deepEqual(REEF_TRAIL.powerups.map((item) => item.type).sort(), ["bone", "squeaky", "zoomies"]);
+  assert.ok(TRAILS.every((level) => level === REEF_TRAIL || (level.water ?? []).length === 0), "only Coral Cove floods");
+  // Each lagoon fills exactly one gap.
+  for (const zone of REEF_TRAIL.water) {
+    assert.ok(REEF_TRAIL.gaps.some((gap) => gap.water && gap.x === zone.x && gap.w === zone.w), `lagoon at ${zone.x} fills a gap`);
+    assert.ok(zone.y > GROUND_Y && zone.y + zone.h > VIEW_HEIGHT + 18 + PUPPY.h / 2, "below the ground's lip, and deep enough to sink out of");
+  }
+});
+
+test("Coral Cove's lagoons matter: the doghouse and the golden key need a swim, and every treat can be reached", () => {
+  assert.ok(REEF_TRAIL.water.length >= 3, "a few lagoons");
+  const all = reachableSurfaces(REEF_TRAIL);
+  for (const treat of REEF_TRAIL.treats) {
+    assert.ok([...all.reachable].some((surface) => canTouch(surface, treat)), `treat at x=${treat.x}, y=${treat.y} cannot be reached`);
+  }
+  const dry = { ...REEF_TRAIL, water: [] };
+  const { surfaces, reachable } = reachableSurfaces(dry);
+  const exitFloor = surfaceUnder(surfaces.filter((surface) => surface.id.startsWith("ground")), dry.exit.x + 8);
+  assert.ok(!reachable.has(exitFloor), "the doghouse needs a swim");
+  assert.ok(![...reachable].some((surface) => canTouch(surface, dry.key)), "the key needs a swim");
+  assert.ok(REEF_TRAIL.key.y > GROUND_Y, "the golden key lies under the water");
+  // Every flooded gap is too wide to jump, so each one is a real swim.
+  for (const gap of REEF_TRAIL.gaps.filter((gap) => gap.water)) {
+    assert.ok(!canHop({ x0: gap.x - TILE, x1: gap.x, y: GROUND_Y }, { x0: gap.x + gap.w, x1: gap.x + gap.w + TILE, y: GROUND_Y }), `lagoon at ${gap.x} can be jumped`);
   }
 });
 

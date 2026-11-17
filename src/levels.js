@@ -8,6 +8,8 @@ export const TILE = 16;
 export const VIEW_WIDTH = 480;
 export const VIEW_HEIGHT = 256;
 export const GROUND_Y = 208;
+// A flooded gap's water surface sits this far below the ground's lip (see SWIM in engine.js).
+export const WATER_LINE = 8;
 
 function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkpoint, spikes, enemies, powerups = [], boss = null, ice = [], secret = false, bonus = false, record }) {
   if (!Array.isArray(par) || par.length !== 3 || !par.every((seconds, index) => Number.isFinite(seconds) && seconds > (par[index - 1] ?? 0))) {
@@ -29,7 +31,10 @@ function trail({ name, theme, columns, par, gaps, platforms, treats, key, checkp
     width: columns * TILE,
     start: { x: 48, y: GROUND_Y - 18 },
     ground,
-    gaps: gaps.map(([x, w]) => ({ x: x * TILE, w: w * TILE })),
+    // A third "water" entry floods a gap: the pup can swim across it instead of jumping (see SWIM in engine.js).
+    gaps: gaps.map(([x, w, kind]) => ({ x: x * TILE, w: w * TILE, ...(kind === "water" ? { water: true } : {}) })),
+    water: gaps.filter(([, , kind]) => kind === "water")
+      .map(([x, w]) => ({ x: x * TILE, y: GROUND_Y + WATER_LINE, w: w * TILE, h: 80 - WATER_LINE })),
     // A fourth "ice" entry glazes a platform, leaving one grippy tile at each end so the pup never slides off an edge.
     // A fourth "hay" entry makes it a row of springy hay bales (see HAY in engine.js).
     // A fourth "crumble" entry makes it a sandstone ledge that drops away soon after the pup lands (see crumble.js).
@@ -273,13 +278,52 @@ export const CANYON_TRAIL = trail({
   ],
 });
 
-// The bonus trails in the order they open: Trail 08 after the campaign, then Trail 09 after Trail 08.
-export const BONUS_TRAILS = [BONUS_TRAIL, CANYON_TRAIL];
+// Trail 10, the third bonus trail. It opens once Canyon Caper has been cleared. Four flooded lagoons are
+// too wide to jump: the pup swims across them, paddling with jump to stay afloat, and leaps out near the
+// surface. Pufferfish patrol the deep water and puff up into spiky balls, and the golden key lies on the
+// bottom of the widest lagoon.
+export const REEF_TRAIL = trail({
+  name: "Coral Cove", theme: "reef", columns: 176, par: [37, 50, 75], bonus: true,
+  record: "10-reef",
+  gaps: [[16, 3], [30, 6, "water"], [50, 3], [66, 10, "water"], [92, 12, "water"], [120, 3], [134, 8, "water"], [152, 3]],
+  platforms: [
+    [8, 11, 3], [12, 9, 3], [24, 11, 3], [39, 11, 3], [43, 9, 3], [58, 11, 4], [62, 9, 3],
+    [80, 11, 3], [84, 9, 3], [108, 11, 3], [112, 9, 3], [126, 11, 4], [146, 11, 3], [158, 10, 3],
+  ],
+  treats: [
+    [5, 188], [9, 164], [10, 164], [13, 132], [14, 132], [19, 164], [22, 188], [25, 164], [26, 164],
+    // A few treats bob in each lagoon, some of them deep enough to need a dive.
+    [31, 228], [33, 244], [35, 228],
+    [38, 188], [40, 164], [41, 164], [44, 132], [45, 132], [53, 164], [54, 188], [59, 164], [60, 164], [63, 132], [64, 132],
+    [68, 236], [70, 250], [74, 236],
+    [78, 188], [81, 164], [82, 164], [85, 132], [86, 132], [90, 188],
+    [94, 232], [97, 244], [100, 244], [102, 232],
+    [106, 188], [109, 164], [110, 164], [113, 132], [114, 132], [123, 164], [124, 188], [127, 164], [128, 164],
+    [136, 236], [138, 250], [140, 236],
+    [144, 188], [147, 164], [155, 164], [157, 188], [159, 148], [160, 148], [164, 188],
+  ],
+  powerups: [["squeaky", 37, 188], ["bone", 85, 120], ["zoomies", 125, 188]],
+  key: [98, 250], checkpoint: 78,
+  spikes: [[46, 1], [88, 1], [116, 1], [148, 1]],
+  enemies: [
+    { type: "crab", x: 22, left: 21, right: 26, speed: 22 },
+    { type: "crab", x: 57, left: 55, right: 62, speed: 24 },
+    { type: "crab", x: 110, left: 109, right: 114, speed: 26 },
+    { type: "crab", x: 160, left: 157, right: 164, speed: 26 },
+    { type: "pufferfish", x: 70, left: 68, right: 73, speed: 18, row: 16 },
+    { type: "pufferfish", x: 95, left: 93, right: 96, speed: 20, row: 16, phase: 1 },
+    { type: "pufferfish", x: 137, left: 135, right: 139, speed: 20, row: 16, phase: 2 },
+  ],
+});
 
-// Every playable trail: the campaign, the bonus trails from `BONUS_INDEX` (Trail 08) and `CANYON_INDEX`
-// (Trail 09), then the secret trail at `SECRET_INDEX`. Saved records use each trail's `record` key, so
-// these positions can move without touching old saves.
+// The bonus trails in the order they open: Trail 08 after the campaign, then each one after the trail before it.
+export const BONUS_TRAILS = [BONUS_TRAIL, CANYON_TRAIL, REEF_TRAIL];
+
+// Every playable trail: the campaign, the bonus trails from `BONUS_INDEX` (Trail 08), `CANYON_INDEX`
+// (Trail 09) and `REEF_INDEX` (Trail 10), then the secret trail at `SECRET_INDEX`. Saved records use each
+// trail's `record` key, so these positions can move without touching old saves.
 export const BONUS_INDEX = LEVELS.length;
 export const CANYON_INDEX = LEVELS.length + 1;
+export const REEF_INDEX = LEVELS.length + 2;
 export const SECRET_INDEX = LEVELS.length + BONUS_TRAILS.length;
 export const TRAILS = [...LEVELS, ...BONUS_TRAILS, SECRET_TRAIL];

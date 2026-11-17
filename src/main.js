@@ -197,6 +197,13 @@ const BONUS_COPY = {
     intro: "Sandstone ledges crumble soon after you land, so keep moving. They re-form a moment later.",
     unlock: "BEAT HARVEST HOLLOW TO OPEN",
   },
+  "10-reef": {
+    won: ["CORAL COVE CLEARED", "Fin-tastic, good dog!", "cleared! You paddled across the lagoons, dodged the puffed-up pufferfish and dived for the golden key. Race it again to chase a shinier paw medal.", "Splash again"],
+    reveal: "You hear waves lapping on a coral reef…",
+    needKey: "The golden key lies at the bottom of the widest lagoon: dive in and paddle down to it!",
+    intro: "Jump into a lagoon to swim. Tap jump to paddle up, and tap it near the surface to leap out. Puffed-up pufferfish are too spiky to stomp!",
+    unlock: "BEAT CANYON CAPER TO OPEN",
+  },
 };
 const bonusCopy = (level) => BONUS_COPY[level.record];
 const bonusOpenCount = () => bonusTrailsOpen(bestTimes, LEVELS, BONUS_TRAILS.length);
@@ -406,7 +413,7 @@ function recordClear(index) {
   bestTimes = result.times;
   if (result.newBest) saveBestTimes();
   const secretRevealed = !wasSecretOpen && secretTrailOpen(bestTimes, LEVELS);
-  // The bonus trail this clear opened, if any (the finale opens Trail 08, Trail 08 opens Trail 09).
+  // The bonus trail this clear opened, if any (the finale opens Trail 08, then each bonus trail opens the next).
   const bonusRevealed = bonusOpenCount() > wasBonusOpen ? { index: BONUS_INDEX + wasBonusOpen, record: TRAILS[BONUS_INDEX + wasBonusOpen].record } : null;
   return { index, ms, best: result.best, newBest: result.newBest, medal: medalFor(ms, par), next: nextMedal(ms, par), secretRevealed, bonusRevealed };
 }
@@ -577,7 +584,7 @@ let trailLayout = null;
 
 const stopNumber = (index) => index === SECRET_INDEX ? "★" : String(index + 1).padStart(2, "0");
 const stopName = (index) => index === SECRET_INDEX ? `Secret trail, ${TRAILS[index].name}` : `Trail ${stopNumber(index)}${TRAILS[index].bonus ? " bonus" : ""}, ${TRAILS[index].name}`;
-// The campaign plus the bonus Trails 08 and 09 (padlocked until Moonlit Keep, then Harvest Hollow, is beaten).
+// The campaign plus the bonus Trails 08-10 (each padlocked until the trail before it is beaten).
 const MAP_TRAILS = LEVELS.length + BONUS_TRAILS.length;
 
 // The map shows the campaign and the bonus trails, plus the secret trail's stop once it has been found.

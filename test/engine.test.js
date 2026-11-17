@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CRUMBLE } from "../src/crumble.js";
-import { createGame, HAY, ICE, iceUnder, intersects, nextLevel, pauseGame, PHYSICS, restartGame, resumeGame, startGame, stepGame } from "../src/engine.js";
-import { BONUS_INDEX, CANYON_INDEX, GROUND_Y, LEVELS, SECRET_INDEX, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "../src/levels.js";
+import { createGame, HAY, ICE, iceUnder, intersects, nextLevel, pauseGame, PHYSICS, restartGame, resumeGame, startGame, stepGame, SWIM, waterAt } from "../src/engine.js";
+import { BONUS_INDEX, CANYON_INDEX, GROUND_Y, LEVELS, REEF_INDEX, SECRET_INDEX, TRAILS, VIEW_HEIGHT, VIEW_WIDTH } from "../src/levels.js";
 
 const tick = (game, input = {}) => stepGame(game, input, 1 / 120);
 function playing() {
@@ -244,8 +244,9 @@ test("every spawn, checkpoint, and exit has safe ground, and gaps are jumpable",
       assert.ok(level.enemies.every((enemy) => x + 14 < enemy.left || x > enemy.right + enemy.w));
     }
     const jumpDistance = PHYSICS.speed * PHYSICS.jump * 2 / PHYSICS.gravity;
-    // Canyon Caper's wide canyons are crossed on crumbling ledges instead (its reachability is checked in levels.test.js).
-    const bridged = (gap) => level.platforms.some((platform) => platform.crumble && platform.x >= gap.x && platform.x + platform.w <= gap.x + gap.w);
+    // Canyon Caper's wide canyons are crossed on crumbling ledges instead (reachability is checked in levels.test.js).
+    // Coral Cove's flooded lagoons are swum across instead.
+    const bridged = (gap) => gap.water || level.platforms.some((platform) => platform.crumble && platform.x >= gap.x && platform.x + platform.w <= gap.x + gap.w);
     assert.ok(level.gaps.every((gap) => gap.w < jumpDistance - 16 || bridged(gap)), `${level.name}: a gap is too wide to jump`);
     assert.ok(level.width > VIEW_WIDTH);
   }
@@ -419,6 +420,87 @@ test("an untouched crumbling ledge re-forms on its own, and clearing Trail 09 en
   assert.equal(game.levelIndex, CANYON_INDEX);
   restartGame(game);
   assert.equal(game.levelIndex, CANYON_INDEX, "trying again replays Trail 09");
+});
+
+// Drops the pup into Coral Cove's first lagoon, `depth` pixels below the water line (its head, not its middle).
+function inLagoon(depth) {
+  const game = createGame(REEF_INDEX);
+  startGame(game);
+  const lagoon = game.level.water[0];
+  // Clear the critters so only the water matters.
+  game.level.enemies = [];
+  place(game, lagoon.x + lagoon.w / 2 - 7, lagoon.y + depth);
+  return { game, lagoon };
+}
+
+test("in a lagoon the pup splashes in, sinks slowly and swims a little slower", () => {
+  const { game, lagoon } = inLagoon(4);
+  tick(game);
+  assert.equal(game.player.inWater, true);
+  assert.equal(waterAt(game.level, game.player), lagoon);
+  assert.ok(game.events.some((event) => event.type === "splash"), "jumping in makes a splash");
+  for (let t = 0; t < 0.5; t += 1 / 120) tick(game, { right: true });
+  assert.ok(game.player.vy > 0 && game.player.vy <= SWIM.maxFall, "it sinks, but slowly");
+  assert.ok(game.player.vx > 0 && game.player.vx <= PHYSICS.speed * SWIM.speed + 1e-9, "it paddles along slower than it runs");
+  assert.equal(game.events.filter((event) => event.type === "splash").length, 1, "only one splash while it stays in");
+  // Out of the water the same half second of falling is far faster.
+  const dry = playing();
+  place(dry, 48, 40);
+  for (let t = 0; t < 0.5; t += 1 / 120) tick(dry);
+  assert.ok(dry.player.vy > SWIM.maxFall * 3);
+  assert.equal(waterAt(dry.level, dry.player), null, "campaign trails have no water");
+});
+
+test("each jump press underwater is a paddle stroke, and steady strokes keep the pup afloat", () => {
+  const { game, lagoon } = inLagoon(30);
+  tick(game);
+  game.events.length = 0;
+  tick(game, { jumpPressed: true });
+  assert.ok(Math.abs(game.player.vy + SWIM.stroke) < 5, "a stroke pushes the pup up");
+  assert.deepEqual(game.events.map((event) => event.type), ["swim"]);
+  // Letting go of jump does not cut a stroke short the way it cuts a jump.
+  tick(game);
+  assert.ok(game.player.vy < -SWIM.stroke + 5);
+  // Paddling every 0.4 seconds for six seconds never sinks out of view.
+  for (let t = 0; t < 6; t += 1 / 120) tick(game, { jumpPressed: Math.round(t * 120) % 48 === 0 });
+  assert.equal(game.lives, 3);
+  assert.ok(game.player.y < VIEW_HEIGHT && game.player.y > lagoon.y - game.player.h, "still swimming in the lagoon");
+});
+
+test("near the surface a jump press leaps clean out of the lagoon onto the bank", () => {
+  const { game, lagoon } = inLagoon(0);
+  tick(game);
+  game.events.length = 0;
+  tick(game, { jumpPressed: true, jumpHeld: true, right: true });
+  assert.equal(game.player.vy, -PHYSICS.jump + SWIM.gravity / 120, "a full jump out of the water");
+  assert.deepEqual(game.events.map((event) => event.type), ["splash"]);
+  for (let t = 0; t < 1.5 && !game.player.grounded; t += 1 / 120) tick(game, { right: true, jumpHeld: true });
+  assert.equal(game.player.grounded, true);
+  assert.equal(game.player.y, GROUND_Y - game.player.h, "landed on the far bank");
+  assert.ok(game.player.x >= lagoon.x + lagoon.w - game.player.w);
+  assert.equal(game.player.inWater, false);
+});
+
+test("a pup that stops paddling sinks out of view and loses a heart", () => {
+  const { game } = inLagoon(20);
+  for (let t = 0; t < 4 && game.lives === 3; t += 1 / 120) tick(game);
+  assert.equal(game.lives, 2);
+  assert.equal(game.player.inWater, false, "it starts again on dry land");
+});
+
+test("on dry ground in Coral Cove jumps are unchanged, and clearing Trail 10 ends the run", () => {
+  const game = createGame(REEF_INDEX);
+  startGame(game);
+  tick(game);
+  tick(game, { jumpPressed: true, jumpHeld: true });
+  assert.equal(game.player.inWater, false);
+  assert.equal(game.player.vy, -PHYSICS.jump + PHYSICS.gravity / 120);
+  finish(game);
+  assert.equal(game.status, "won");
+  nextLevel(game);
+  assert.equal(game.levelIndex, REEF_INDEX);
+  restartGame(game);
+  assert.equal(game.levelIndex, REEF_INDEX, "trying again replays Trail 10");
 });
 
 test("clearing the secret trail ends the run without wrapping into the campaign", () => {
